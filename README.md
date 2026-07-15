@@ -48,3 +48,7 @@ Never commit `.env.local`, API keys, passwords, private keys, or production
 deployment configuration. Variables prefixed with `VITE_` are public browser
 configuration, not a safe place for secrets. Server-side secrets should be set
 with the Convex environment-variable commands.
+
+## License
+
+Bluetape is available under the [MIT License](LICENSE).
