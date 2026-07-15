@@ -1,0 +1,239 @@
+#!/usr/bin/env bash
+# bluetape — CLI for the Bluetape household coordination app.
+# Agents can use this to interact with the app programmatically.
+#
+# Usage:
+#   export BLAUTAPE_URL=https://your-deployment.convex.site
+#   export BLAUTAPE_API_KEY=your-api-key
+#
+#   bluetape today [date]
+#   bluetape tasks [--status pending|done]
+#   bluetape task:add <title> [--due YYYY-MM-DD]
+#   bluetape task:done <id>
+#   bluetape grocery
+#   bluetape grocery:add <name> [--qty "2kg"]
+#   bluetape grocery:bought <id>
+#   bluetape routines
+#   bluetape routine:add <title> [--daily|--weekly|--monthly] [--dow N] [--dom N]
+#   bluetape routine:toggle <id> [--date YYYY-MM-DD]
+#   bluetape pages [--type item|rule|recipe|general]
+#   bluetape page:get <slug>
+#   bluetape page:create <title> --type item [--content "..."]
+#   bluetape search <query>
+#   bluetape setup-key <api-key>           # set API key (first time)
+#   bluetape help
+
+set -euo pipefail
+
+BLAUTAPE_URL="${BLAUTAPE_URL:-}"
+BLAUTAPE_API_KEY="${BLAUTAPE_API_KEY:-}"
+
+if [ -z "$BLAUTAPE_URL" ]; then
+  # Try to detect from .env.local
+  if [ -f .env.local ]; then
+    BLAUTAPE_URL=$(grep VITE_CONVEX_SITE_URL .env.local 2>/dev/null | cut -d= -f2)
+  fi
+fi
+
+if [ -z "$BLAUTAPE_URL" ]; then
+  echo "❌ Set BLAUTAPE_URL (e.g. https://your-project.convex.site)"
+  echo "   Or run from the project directory (reads .env.local)"
+  exit 1
+fi
+
+API="${BLAUTAPE_URL}/api"
+CURL="curl -sS"
+
+_auth() {
+  if [ -n "$BLAUTAPE_API_KEY" ]; then
+    echo "-H Authorization: Bearer $BLAUTAPE_API_KEY"
+  fi
+}
+
+_get() {
+  local path="$1"; shift
+  $CURL $(eval echo $(_auth)) "$API/$path" "$@"
+}
+
+_post() {
+  local path="$1"; shift
+  $CURL -X POST $(eval echo $(_auth)) -H "Content-Type: application/json" "$API/$path" -d "$1"
+}
+
+case "${1:-help}" in
+  today)
+    date="${2:-$(date -u -v+8H +%Y-%m-%d 2>/dev/null || date -u -d '+8 hours' +%Y-%m-%d)}"
+    _get "today?date=$date"
+    ;;
+
+  tasks)
+    status="${2:-}"
+    if [ -n "$status" ]; then
+      _get "tasks?status=$status"
+    else
+      _get "tasks"
+    fi
+    ;;
+
+  task:add)
+    title="${2:-}"
+    due=""
+    shift 2 2>/dev/null || true
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --due) due="$2"; shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    if [ -z "$title" ]; then echo "Usage: bluetape task:add <title> [--due YYYY-MM-DD]"; exit 1; fi
+    body="{\"title\":$(echo "$title" | jq -R .)"
+    if [ -n "$due" ]; then body+=",\"dueDate\":$(echo "$due" | jq -R .)"; fi
+    body+="}"
+    _post "tasks" "$body"
+    ;;
+
+  task:done)
+    id="${2:-}"
+    if [ -z "$id" ]; then echo "Usage: bluetape task:done <task-id>"; exit 1; fi
+    _post "tasks/$id/done" "{}"
+    ;;
+
+  grocery)
+    _get "grocery"
+    ;;
+
+  grocery:add)
+    name="${2:-}"
+    qty=""
+    shift 2 2>/dev/null || true
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --qty) qty="$2"; shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    if [ -z "$name" ]; then echo "Usage: bluetape grocery:add <name> [--qty ...]"; exit 1; fi
+    body="{\"name\":$(echo "$name" | jq -R .)"
+    if [ -n "$qty" ]; then body+=",\"quantity\":$(echo "$qty" | jq -R .)"; fi
+    body+="}"
+    _post "grocery" "$body"
+    ;;
+
+  grocery:bought)
+    id="${2:-}"
+    if [ -z "$id" ]; then echo "Usage: bluetape grocery:bought <item-id>"; exit 1; fi
+    _post "grocery/$id/bought" "{}"
+    ;;
+
+  routines)
+    _get "routines"
+    ;;
+
+  routine:toggle)
+    id="${2:-}"
+    date=""
+    shift 2 2>/dev/null || true
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --date) date="$2"; shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    if [ -z "$id" ]; then echo "Usage: bluetape routine:toggle <id> [--date YYYY-MM-DD]"; exit 1; fi
+    body="{"
+    if [ -n "$date" ]; then body+="\"date\":$(echo "$date" | jq -R .)"; fi
+    body+="}"
+    _post "routines/$id/toggle" "$body"
+    ;;
+
+  pages)
+    type="${2:-}"
+    if [ -n "$type" ]; then
+      _get "pages?type=$type"
+    else
+      echo "Usage: bluetape pages --type item|rule|recipe|general"
+      exit 1
+    fi
+    ;;
+
+  page:get)
+    slug="${2:-}"
+    if [ -z "$slug" ]; then echo "Usage: bluetape page:get <slug>"; exit 1; fi
+    _get "pages/$slug"
+    ;;
+
+  page:create)
+    title="${2:-}"
+    type=""
+    content=""
+    shift 2 2>/dev/null || true
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --type) type="$2"; shift 2 ;;
+        --content) content="$2"; shift 2 ;;
+        *) shift ;;
+      esac
+    done
+    if [ -z "$title" ] || [ -z "$type" ]; then
+      echo "Usage: bluetape page:create <title> --type item|rule|recipe|general [--content ...]"
+      exit 1
+    fi
+    body="{\"title\":$(echo "$title" | jq -R .),\"type\":$(echo "$type" | jq -R .),\"content\":$(echo "$content" | jq -R .)}"
+    _post "pages" "$body"
+    ;;
+
+  search)
+    query="${2:-}"
+    if [ -z "$query" ]; then echo "Usage: bluetape search <query>"; exit 1; fi
+    _get "search?q=$(echo "$query" | jq -sRr @uri)"
+    ;;
+
+  setup-key)
+    key="${2:-}"
+    if [ -z "$key" ]; then echo "Usage: bluetape setup-key <api-key>"; exit 1; fi
+    if [ -n "$BLAUTAPE_API_KEY" ]; then
+      # Key already set — authenticate with existing key
+      $CURL -X POST -H "Authorization: Bearer $BLAUTAPE_API_KEY" \
+        -H "Content-Type: application/json" \
+        "$API/setup" -d "{\"apiKey\":$(echo "$key" | jq -R .)}"
+    else
+      # First-time bootstrap — no auth needed
+      $CURL -X POST -H "Content-Type: application/json" \
+        "$API/setup" -d "{\"apiKey\":$(echo "$key" | jq -R .)}"
+    fi
+    ;;
+
+  help|*)
+    cat <<EOF
+bluetape — CLI for Bluetape household coordination
+
+Usage:
+  export BLAUTAPE_URL=https://your-deployment.convex.site
+  export BLAUTAPE_API_KEY=your-key
+
+Commands:
+  today [date]               Today's dashboard (routines + tasks due)
+  tasks [--status S]         List tasks
+  task:add <title> [--due D] Create a task
+  task:done <id>             Mark task done
+  grocery                    List pending shopping items
+  grocery:add <name> [--qty] Add shopping item
+  grocery:bought <id>        Mark item bought
+  routines                   List active routines
+  routine:toggle <id>        Toggle routine completion
+  pages --type T             List pages by type
+  page:get <slug>            Get page by slug
+  page:create <title> --type T [--content ...]  Create a page
+  search <query>             Search pages by title
+  setup-key <key>            Set API key (first-time bootstrap)
+
+Examples:
+  bluetape today
+  bluetape task:add "Buy rice" --due 2026-07-08
+  bluetape task:done some-task-id
+  bluetape grocery:add "Milk" --qty "2L"
+  bluetape page:get toilet-detergent
+  bluetape setup-key my-secret-key-12345
+EOF
+    ;;
+esac

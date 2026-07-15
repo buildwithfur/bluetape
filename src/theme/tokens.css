@@ -1,0 +1,52 @@
+/* Bluetape tokens — derived from DESIGN.md.
+   The YAML frontmatter tokens in DESIGN.md are normative; this file maps them
+   into CSS variables and Tailwind v4 @theme entries. Update DESIGN.md first. */
+
+:root {
+  /* Foundation — warm paper, no stark white */
+  --bt-background: #f5f2eb;
+  --bt-background-alt: #f0ece4;
+  --bt-surface: #fbf8f2;
+  --bt-surface-hover: #f8f4ee;
+  --bt-surface-active: #f2ede5;
+  --bt-surface-floating: #ffffff;
+
+  /* Borders — warm tint, never cool gray */
+  --bt-border-subtle: #ece5d9;
+  --bt-border: #e2dacd;
+  --bt-border-strong: #d5cbb9;
+
+  /* Ink — navy as primary text */
+  --bt-ink: #0a2950;
+  --bt-ink-700: #173c68;
+  --bt-text-primary: #171a20;
+  --bt-text-secondary: #5a5660;
+  --bt-text-tertiary: #8a7e6a;
+  --bt-text-disabled: #c9c0ae;
+  --bt-text-on-accent: #ffffff;
+
+  /* Brand accent — orange (restrained) */
+  --bt-accent: #e3751b;
+  --bt-accent-hover: #cc6412;
+  --bt-accent-soft: #f7c99d;
+  --bt-accent-bg: #fff7ef;
+
+  /* Semantic */
+  --bt-success-bg: #eef8f2;
+  --bt-success-text: #2a6b43;
+  --bt-success-accent: #52b46b;
+  --bt-warning-bg: #fff7e9;
+  --bt-warning-text: #996100;
+  --bt-warning-accent: #e6a325;
+  --bt-error-bg: #fceeee;
+  --bt-error-text: #b63d3d;
+  --bt-error-accent: #df5a5a;
+  --bt-info-bg: #eef5fd;
+  --bt-info-text: #2a609d;
+  --bt-info-accent: #4a89dd;
+
+  /* Tap-target and surface overlay shadow (overlays only) */
+  --bt-overlay-shadow: 0 4px 12px rgba(10, 41, 80, 0.025);
+
+  color-scheme: light;
+}

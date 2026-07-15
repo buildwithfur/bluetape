@@ -1,0 +1,36 @@
+.wikilink {
+  color: var(--bt-ink-700);
+  text-decoration: underline;
+  text-decoration-color: var(--bt-ink-700);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  border-radius: 2px;
+  transition: background-color 120ms ease-out;
+}
+.wikilink:hover,
+.wikilink:active {
+  background-color: var(--bt-ink-700) / 8%;
+  background: rgba(23, 60, 104, 0.08);
+}
+.wikilink:not(.broken)::after {
+  content: "↗";
+  display: inline-block;
+  margin-left: 0.16em;
+  font-size: 0.62em;
+  font-weight: 600;
+  line-height: 0;
+  text-decoration: none;
+  opacity: 1;
+  vertical-align: super;
+}
+.wikilink.broken {
+  color: var(--bt-text-tertiary);
+  text-decoration: underline dashed;
+  text-decoration-color: var(--bt-border-strong);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.wikilink.broken:hover {
+  color: var(--bt-ink-700);
+  text-decoration-color: var(--bt-ink-700);
+}

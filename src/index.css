@@ -1,0 +1,151 @@
+@import './theme/tokens.css';
+@import 'tailwindcss';
+
+/* ---- Tailwind v4 theme: maps DESIGN.md tokens to utility classes ---- */
+@theme {
+  /* Backgrounds */
+  --color-background: var(--bt-background);
+  --color-background-alt: var(--bt-background-alt);
+  --color-surface: var(--bt-surface);
+  --color-surface-hover: var(--bt-surface-hover);
+  --color-surface-active: var(--bt-surface-active);
+  --color-surface-floating: var(--bt-surface-floating);
+
+  /* Borders */
+  --color-border-subtle: var(--bt-border-subtle);
+  --color-border-line: var(--bt-border);
+  --color-border-strong: var(--bt-border-strong);
+
+  /* Ink + text */
+  --color-ink: var(--bt-ink);
+  --color-ink-700: var(--bt-ink-700);
+  --color-text-primary: var(--bt-text-primary);
+  --color-text-secondary: var(--bt-text-secondary);
+  --color-text-tertiary: var(--bt-text-tertiary);
+  --color-text-disabled: var(--bt-text-disabled);
+  --color-text-on-accent: var(--bt-text-on-accent);
+
+  /* Accent */
+  --color-accent: var(--bt-accent);
+  --color-accent-hover: var(--bt-accent-hover);
+  --color-accent-soft: var(--bt-accent-soft);
+  --color-accent-bg: var(--bt-accent-bg);
+
+  /* Semantic */
+  --color-success-bg: var(--bt-success-bg);
+  --color-success-text: var(--bt-success-text);
+  --color-success-accent: var(--bt-success-accent);
+  --color-warning-bg: var(--bt-warning-bg);
+  --color-warning-text: var(--bt-warning-text);
+  --color-warning-accent: var(--bt-warning-accent);
+  --color-error-bg: var(--bt-error-bg);
+  --color-error-text: var(--bt-error-text);
+  --color-error-accent: var(--bt-error-accent);
+  --color-info-bg: var(--bt-info-bg);
+  --color-info-text: var(--bt-info-text);
+  --color-info-accent: var(--bt-info-accent);
+
+  /* Radii */
+  --radius-xs: 8px;
+  --radius-sm: 12px;
+  --radius-md: 20px;
+  --radius-lg: 28px;
+  --radius-full: 9999px;
+
+  /* Fonts */
+  --font-sans: 'Satoshi', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-local-script: 'Noto Sans', 'Satoshi', sans-serif;
+
+  /* Motion */
+  --ease-press: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* ---- Base ---- */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bt-background);
+  color: var(--bt-text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-synthesis: none;
+  /* Use OS text sizing for the helper's phone */
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Headline balance + tracking per DESIGN.md */
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+  color: var(--bt-ink);
+}
+
+/* ---- Page-scale utilities (page margin = 22px per DESIGN.md) ---- */
+@utility page-px {
+  padding-left: 22px;
+  padding-right: 22px;
+}
+@utility page-pt {
+  padding-top: 22px;
+}
+@utility page-pb {
+  padding-bottom: 22px;
+}
+@utility app-max-w {
+  max-width: 420px;
+}
+
+/* Sugar: small-caps label helper (label-caps token) */
+.label-caps {
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* Mono helpers */
+.mono-md { font-family: var(--font-mono); font-size: 13px; line-height: 1.4; }
+.mono-sm { font-family: var(--font-mono); font-size: 12px; line-height: 1.4; }
+
+/* Remove tap highlight, set touch-action defaults */
+button,
+a,
+[role='button'] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Long-form content cap */
+.prose-capped { max-width: 65ch; }
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Hide native checkbox/radio visuals where we draw our own */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
