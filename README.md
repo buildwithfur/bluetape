@@ -42,12 +42,106 @@ npm run lint
 - [`docs/plans/PLAN.md`](docs/plans/PLAN.md) — product and implementation plan
 - [`docs/adr/`](docs/adr/) — architecture decision records
 
-## Secrets
+## Deploy with Convex and Cloudflare Pages
 
-Never commit `.env.local`, API keys, passwords, private keys, or production
-deployment configuration. Variables prefixed with `VITE_` are public browser
-configuration, not a safe place for secrets. Server-side secrets should be set
-with the Convex environment-variable commands.
+This setup deploys the Convex backend and Vite frontend together whenever the
+production branch is pushed. It uses a production Convex deploy key stored as
+an encrypted Cloudflare Pages environment variable.
+
+### 1. Create the Convex project
+
+After cloning the repository, install dependencies and connect it to a Convex
+project:
+
+```sh
+npm install
+npx convex dev
+```
+
+The command creates or selects the development deployment, pushes the backend,
+and writes the public development connection values to `.env.local`.
+
+### 2. Configure production authentication
+
+Bluetape uses Convex Auth. Initialize its production keys from the project
+directory:
+
+```sh
+npx @convex-dev/auth --prod
+```
+
+When prompted for the site URL, enter the final public URL, such as
+`https://bluetape.example.com`. This configures the production `SITE_URL`,
+`JWT_PRIVATE_KEY`, and `JWKS` values in Convex. If you initially use the
+`pages.dev` address and add a custom domain later, rerun this command with the
+custom-domain URL.
+
+Create a production deploy key for Cloudflare Pages:
+
+```sh
+npx convex deployment token create cloudflare-pages --deployment prod
+```
+
+Copy the printed key. Treat it as a secret; it grants deployment access to the
+production Convex backend.
+
+### 3. Create the Cloudflare Pages project
+
+In the Cloudflare dashboard:
+
+1. Open **Workers & Pages** and select **Create application**.
+2. Choose **Pages** and **Connect to Git**.
+3. Authorize the GitHub repository and select its production branch, normally
+   `main`. For an organization, limit the Cloudflare GitHub App to only the
+   repositories it needs.
+4. Use these build settings:
+
+   ```text
+   Framework preset: None
+   Build command: npx convex deploy --cmd-url-env-var-name VITE_CONVEX_URL --cmd "npm run build"
+   Build output directory: dist
+   Root directory: leave blank (repository root)
+   ```
+
+5. Under **Environment variables**, add `CONVEX_DEPLOY_KEY` and paste the
+   production deploy key from the previous step.
+6. Select **Save and Deploy**.
+
+The build command deploys the Convex schema and functions, supplies the
+production backend URL as `VITE_CONVEX_URL`, builds the React app, and publishes
+`dist/`. Subsequent pushes to the production branch repeat this process.
+
+### 4. Add a custom domain
+
+Complete the first Pages deployment before attaching a domain. Then:
+
+1. Open the Pages project and select **Custom domains**.
+2. Select **Set up a domain**, enter the hostname, and activate it.
+3. If Cloudflare manages the DNS zone in the same account, it can create the
+   required record automatically. Otherwise, add this record at the DNS
+   provider:
+
+   ```text
+   Type: CNAME
+   Name: bluetape
+   Target: <your-pages-project>.pages.dev
+   ```
+
+4. Wait for the custom domain and TLS certificate to become active.
+5. If this hostname differs from the URL used during Convex Auth setup, rerun
+   `npx @convex-dev/auth --prod` with the new URL.
+
+Associate the hostname with the Pages project before manually adding its CNAME.
+Adding only the DNS record is not enough for Pages to serve the domain. Apex
+domains have additional nameserver requirements; see Cloudflare's custom-domain
+guide.
+
+Useful references:
+
+- [Convex production deployments](https://docs.convex.dev/cli/reference/deploy)
+- [Convex Auth production setup](https://labs.convex.dev/auth/production)
+- [Cloudflare Pages Git integration](https://developers.cloudflare.com/pages/get-started/git-integration/)
+- [Cloudflare Pages custom domains](https://developers.cloudflare.com/pages/configuration/custom-domains/)
 
 ## License
 

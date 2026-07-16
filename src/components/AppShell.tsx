@@ -108,7 +108,14 @@ export function SideRail() {
       className="hidden md:flex md:flex-col md:w-56 md:shrink-0 md:border-r md:border-border-subtle md:h-screen md:sticky md:top-0"
     >
       <div className="page-px py-6">
-        <Link to="/" className="block">
+        <Link to="/" className="flex items-center gap-3">
+          <img
+            src="/bluetape-mark.png"
+            alt=""
+            aria-hidden="true"
+            draggable={false}
+            className="size-10 shrink-0 object-contain"
+          />
           <span className="text-xl font-semibold text-ink tracking-tight">{t('app.name')}</span>
         </Link>
       </div>

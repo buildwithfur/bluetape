@@ -31,7 +31,16 @@ function Splash() {
   const { t } = useTranslation()
   return (
     <div className="min-h-screen flex items-center justify-center">
-      <span className="mono-md text-text-tertiary">{t('app.name')}</span>
+      <div className="flex flex-col items-center gap-4 select-none">
+        <img
+          src="/bluetape-mark.png"
+          alt=""
+          aria-hidden="true"
+          draggable={false}
+          className="size-32 object-contain"
+        />
+        <span className="mono-md text-text-tertiary">{t('app.name')}</span>
+      </div>
     </div>
   )
 }
