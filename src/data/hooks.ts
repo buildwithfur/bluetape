@@ -36,9 +36,9 @@ export function useCurrentFamily() {
 export function useCurrentFamilyId(): Id<'families'> | undefined {
   return useCurrentProfile()?.currentFamilyId ?? undefined
 }
-export function useCurrentRole(): 'admin' | 'helper' | 'owner' | undefined {
+export function useCurrentRole(): 'admin' | 'user' | 'owner' | undefined {
   const role = useCurrentFamily()?.role
-  if (role === 'owner' || role === 'admin' || role === 'helper') return role
+  if (role === 'owner' || role === 'admin' || role === 'user') return role
   return undefined
 }
 
@@ -63,7 +63,7 @@ export function useSetMemberRole() {
   return (
     familyId: Id<'families'>,
     userId: Id<'users'>,
-    role: 'admin' | 'helper',
+    role: 'admin' | 'user',
   ) => set({ familyId, userId, role })
 }
 export function useRemoveMember() {
@@ -449,6 +449,10 @@ export function useSetRoutineActive() {
   const update = useMutation(api.routines.update)
   return (routineId: Id<'routines'>, isActive: boolean) =>
     update({ routineId, isActive })
+}
+export function useDeleteRoutine() {
+  const remove = useMutation(api.routines.remove)
+  return (routineId: Id<'routines'>) => remove({ routineId })
 }
 export function useUpdateRoutineDetails() {
   const update = useMutation(api.routines.update)

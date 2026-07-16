@@ -206,7 +206,7 @@ export const pinnedRules = query({
 /**
  * Save (create or update) a page. Family-scoped.
  * Permissions:
- * - Helper: can create item pages; cannot create/edit rules; cannot
+ * - User: can create item pages; cannot create/edit rules; cannot
  *   edit existing pages.
  * - Admin (or owner): full control over all page types.
  */
@@ -234,7 +234,7 @@ export const save = mutation({
     if (args.type === "rule" && !isAdmin) {
       throw new Error("Only admins can create or edit rules");
     }
-    // Editing an existing page is admin-only (helpers can create, not edit).
+    // Editing an existing page is admin-only (users can create, not edit).
     if (args.pageId && !isAdmin) {
       const existing = await ctx.db.get(args.pageId);
       if (existing) {

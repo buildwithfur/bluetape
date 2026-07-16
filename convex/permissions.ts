@@ -56,7 +56,7 @@ export async function requireAuthenticatedUser(
 
 // ─── Family membership ────────────────────────────────────────────────
 
-export type MemberRole = "admin" | "helper";
+export type MemberRole = "admin" | "user";
 
 /** A user's membership in a family, or null if not a member. */
 export async function getMembership(
@@ -114,7 +114,7 @@ export function isOwner(
 
 /**
  * Require an admin-level member: the family owner OR a member with
- * role "admin". Admin members manage content (rules, routines, item
+ * role "admin". Admin members manage content (rules, routines, note
  * edits) but CANNOT manage other members or transfer ownership.
  */
 export async function requireFamilyAdmin(

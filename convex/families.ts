@@ -4,6 +4,7 @@ import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import {
   requireUser,
+  tryUser,
   requireFamilyMember,
   requireFamilyOwner,
   getMembership,
@@ -97,7 +98,11 @@ export const getByInviteToken = query({
       .withIndex("inviteToken", (q) => q.eq("inviteToken", args.token))
       .unique();
     if (!family) return null;
-    return { familyId: family._id, name: family.name };
+    const userId = await tryUser(ctx);
+    const isMember = userId
+      ? (await getMembership(ctx, family._id, userId)) !== null
+      : false;
+    return { familyId: family._id, name: family.name, isMember };
   },
 });
 
@@ -145,7 +150,7 @@ export const create = mutation({
 
 /**
  * Join a family via invite token. The joining user is added as a
- * "helper" — the owner promotes them to admin if desired. No role is
+ * "user" — the owner promotes them to admin if desired. No role is
  * ever self-assigned. Idempotent: if already a member, no-op.
  */
 export const acceptInvite = mutation({
@@ -165,7 +170,7 @@ export const acceptInvite = mutation({
         .query("userProfiles")
         .withIndex("userId", (q) => q.eq("userId", userId))
         .unique();
-      if (profile && !profile.currentFamilyId) {
+      if (profile && profile.currentFamilyId !== family._id) {
         await ctx.db.patch(profile._id, { currentFamilyId: family._id });
       }
       return { familyId: family._id, alreadyMember: true };
@@ -179,7 +184,7 @@ export const acceptInvite = mutation({
     await ctx.db.insert("familyMembers", {
       familyId: family._id,
       userId,
-      role: "helper",
+      role: "user",
       displayName: args.displayName ?? profile?.displayName ?? "Member",
       joinedAt: now,
       invitedBy: family.ownerUserId,
@@ -214,7 +219,7 @@ export const setMemberRole = mutation({
   args: {
     familyId: v.id("families"),
     userId: v.id("users"),
-    role: v.union(v.literal("admin"), v.literal("helper")),
+    role: v.union(v.literal("admin"), v.literal("user")),
   },
   handler: async (ctx, args) => {
     const { family } = await requireFamilyOwner(ctx, args.familyId);

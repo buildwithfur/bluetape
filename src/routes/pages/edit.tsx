@@ -31,6 +31,7 @@ export default function PageEdit() {
   const generateUploadUrl = useGenerateUploadUrl()
 
   const [title, setTitle] = useState(() => searchParams.get('title') ?? '')
+  const [content, setContent] = useState('')
   const [type, setType] = useState<PageType>(() => pageTypeFromQuery(searchParams.get('type')))
   const [photoId, setPhotoId] = useState<Id<'_storage'> | undefined>(undefined)
   const [pinnedToToday, setPinnedToToday] = useState(false)
@@ -42,6 +43,7 @@ export default function PageEdit() {
   // Hydrate from existing page once.
   if (isEdit && page && !loaded) {
     setTitle(page.title)
+    setContent(page.content)
     setType(page.type)
     setPhotoId(page.photoId ?? undefined)
     setPinnedToToday(page.pinnedToToday ?? false)
@@ -77,7 +79,7 @@ export default function PageEdit() {
         pageId: isEdit ? page?._id : undefined,
         title: title.trim(),
         type,
-        content: isEdit ? page?.content ?? '' : '',
+        content: type === 'item' ? content.trim() : isEdit ? page?.content ?? '' : '',
         // These legacy fields are no longer authored in the item form. Preserve
         // existing values during edits instead of deleting stored data.
         localName: isEdit && type === 'item' ? page?.localName : undefined,
@@ -113,24 +115,39 @@ export default function PageEdit() {
 
       <div className="page-px py-4 flex flex-col gap-4">
         <label className="flex flex-col gap-1.5">
-          <span className="label-caps text-text-tertiary">{t('page.field.title')}</span>
+          <span className={type === 'item' ? 'text-[16px] font-medium text-ink' : 'label-caps text-text-tertiary'}>
+            {t('page.field.title')}
+          </span>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="h-12 px-3 rounded-xs bg-surface border border-border-line text-text-primary focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+            className="h-12 rounded-xs border border-border-line bg-surface px-3 text-text-primary focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
           />
         </label>
 
         {type === 'item' && (
-          <div>
-            <span className="label-caps text-text-tertiary mb-2 block">{t('page.field.photo')}</span>
-            <PhotoCapture
-              storageId={photoId}
-              previewUrl={photoUrl ?? undefined}
-              onChange={setPhotoId}
-              upload={generateUploadUrl}
-            />
-          </div>
+          <>
+            <label className="flex flex-col gap-1.5">
+              <span className="text-[16px] font-medium text-ink">{t('page.field.content')}</span>
+              <textarea
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                rows={5}
+                placeholder={t('page.field.contentPlaceholder')}
+                className="resize-y rounded-xs border border-border-line bg-surface px-3 py-3 text-text-primary placeholder:text-text-tertiary focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+              />
+            </label>
+
+            <div>
+              <span className="label-caps text-text-tertiary mb-2 block">{t('page.field.photo')}</span>
+              <PhotoCapture
+                storageId={photoId}
+                previewUrl={photoUrl ?? undefined}
+                onChange={setPhotoId}
+                upload={generateUploadUrl}
+              />
+            </div>
+          </>
         )}
 
         {type === 'rule' && (
