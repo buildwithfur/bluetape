@@ -9,7 +9,7 @@ import { useQuery, useMutation } from 'convex/react'
 import type { OptimisticLocalStore } from 'convex/browser'
 import { api } from '@convex/_generated/api'
 import type { Doc, Id } from '@convex/_generated/dataModel'
-import { addDaysISO, todayInSG } from '@/lib/date'
+import { todayInSG } from '@/lib/date'
 import { useCurrentSGDate } from '@/hooks/useCurrentSGDate'
 import type { PageType, Frequency } from '@/types'
 
@@ -180,9 +180,9 @@ export function useAllTitles() {
   const familyId = useCurrentFamilyId()
   return useQuery(api.pages.allTitles, familyId ? { familyId } : 'skip')
 }
-export function useAllPages() {
+export function useAllPages(enabled = true) {
   const familyId = useCurrentFamilyId()
-  return useQuery(api.pages.listAll, familyId ? { familyId } : 'skip')
+  return useQuery(api.pages.listAll, familyId && enabled ? { familyId } : 'skip')
 }
 // ─── Shopping ────────────────────────────────────────────────────────────
 export function useShopping() {
@@ -207,22 +207,11 @@ export function useGroceryItem(itemId: string | undefined) {
  * loading state. All calls are deduplicated with the matching route hooks.
  */
 export function useNavigationWarmup() {
-  const familyId = useCurrentFamilyId()
-  const family = useCurrentFamily()
   const today = todayInSG()
-  const tomorrow = addDaysISO(today, 1)
 
   useToday(today, true)
-  useToday(tomorrow)
-  useUpcomingTasks(tomorrow)
   useRoutines()
   useShopping()
-  usePages('item')
-  usePages('rule')
-  useAllPages()
-  useWikiTargetMap()
-  useListMembers(familyId)
-  useApiKeys(family?.role === 'owner' ? familyId : undefined)
 }
 
 // ─── File storage ───────────────────────────────────────────────────────
@@ -479,12 +468,12 @@ export function useUpdateProfile() {
 }
 
 // ─── Search (client-side over family pages + tasks) ────────────────────
-export function useSearch(query: string) {
-  const pages = useAllPages()
+export function useSearch(query: string, enabled = true) {
+  const pages = useAllPages(enabled)
   const familyId = useCurrentFamilyId()
   const tasks = useQuery(
     api.tasks.list,
-    familyId ? { familyId, status: 'pending' } : 'skip',
+    familyId && enabled ? { familyId, status: 'pending' } : 'skip',
   )
   const q = query.trim().toLowerCase()
   if (!q || !pages || !tasks) return { items: [], rules: [], tasks: [] }

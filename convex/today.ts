@@ -130,12 +130,26 @@ export const list = query({
 
     // 2. Tasks due on this date. Undated, ad-hoc tasks appear only when the
     // client explicitly identifies this as its Today view.
-    const pendingTasks = await ctx.db
+    const dueTasks = await ctx.db
       .query("tasks")
       .withIndex("status_dueDate", (q) =>
-        q.eq("familyId", args.familyId).eq("status", "pending"),
+        q
+          .eq("familyId", args.familyId)
+          .eq("status", "pending")
+          .eq("dueDate", args.date),
       )
       .collect();
+    const undatedTasks = args.includeUndatedTasks === true
+      ? await ctx.db
+        .query("tasks")
+        .withIndex("status_dueDate", (q) =>
+          q
+            .eq("familyId", args.familyId)
+            .eq("status", "pending")
+            .eq("dueDate", undefined),
+        )
+        .collect()
+      : [];
     const { start: currentDayStart, end: currentDayEnd } =
       singaporeDayBounds(args.currentDate);
     const completedToday = await ctx.db
@@ -152,7 +166,8 @@ export const list = query({
       task.dueDate === args.date ||
       (args.includeUndatedTasks === true && !task.dueDate);
     const todayTasks = [
-      ...pendingTasks.filter(belongsOnDate),
+      ...dueTasks,
+      ...undatedTasks,
       ...completedToday.filter(
         (task) => belongsOnDate(task),
       ),
@@ -220,19 +235,21 @@ export const upcoming = query({
     const pending = await ctx.db
       .query("tasks")
       .withIndex("status_dueDate", (q) =>
-        q.eq("familyId", args.familyId).eq("status", "pending"),
+        q
+          .eq("familyId", args.familyId)
+          .eq("status", "pending")
+          .gt("dueDate", args.afterDate),
       )
       .collect();
     for (const t of pending) {
-      if (t.dueDate && t.dueDate > args.afterDate) {
-        items.push({
-          kind: "task",
-          date: t.dueDate,
-          taskId: t._id,
-          title: t.title,
-          createdBy: t.createdBy,
-        });
-      }
+      if (!t.dueDate) continue;
+      items.push({
+        kind: "task",
+        date: t.dueDate,
+        taskId: t._id,
+        title: t.title,
+        createdBy: t.createdBy,
+      });
     }
 
     items.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));

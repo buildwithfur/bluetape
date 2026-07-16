@@ -18,7 +18,7 @@ export default function More() {
     ...(role === 'owner' || role === 'admin'
       ? [{ to: '/family', label: t('more.family'), hint: t('more.familyHint') }]
       : []),
-    { to: '/settings', label: t('settings.title'), hint: t('settings.hint') },
+    { to: '/language', label: t('settings.language'), hint: t('settings.hint') },
   ]
 
   return (

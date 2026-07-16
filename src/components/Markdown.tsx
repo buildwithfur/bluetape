@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useWikiTargetMap } from '@/data/hooks'
 import { createMarkdownIt } from '@/lib/wiki'
 import type { RenderEnv } from '@/types'
@@ -18,6 +19,7 @@ export function Markdown({
   className?: string
   inline?: boolean
 }) {
+  const navigate = useNavigate()
   const targetMap = useWikiTargetMap()
   const md = useMemo(() => createMarkdownIt(), [])
   const env: RenderEnv = useMemo(() => ({ targetMap }), [targetMap])
@@ -43,13 +45,33 @@ export function Markdown({
     className,
   )
 
+  function handleClick(event: React.MouseEvent<HTMLSpanElement | HTMLDivElement>) {
+    if (
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) return
+
+    const target = event.target
+    if (!(target instanceof Element)) return
+    const link = target.closest<HTMLAnchorElement>('a.wikilink')
+    const href = link?.getAttribute('href')
+    if (!link || !href || !href.startsWith('/') || href.startsWith('//')) return
+
+    event.preventDefault()
+    navigate(href)
+  }
+
   if (inline) {
-    return <span className={classes} dangerouslySetInnerHTML={{ __html: html }} />
+    return <span className={classes} onClick={handleClick} dangerouslySetInnerHTML={{ __html: html }} />
   }
 
   return (
     <div
       className={classes}
+      onClick={handleClick}
       dangerouslySetInnerHTML={{ __html: html }}
     />
   )

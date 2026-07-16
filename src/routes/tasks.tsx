@@ -13,7 +13,6 @@ import {
   useUpcomingTasks,
   useToggleRoutineCompletion,
   useToggleTaskDone,
-  useCurrentProfile,
 } from '@/data/hooks'
 import { cn } from '@/lib/cn'
 import type { Doc } from '@convex/_generated/dataModel'
@@ -68,16 +67,12 @@ function DaySection({
   heading,
   date,
   data,
-  profile,
-  addedByYouLabel,
   toggleTaskDone,
   footer,
 }: {
   heading: string
   date: string
   data: ReturnType<typeof useToday>
-  profile: { userId: string } | undefined
-  addedByYouLabel: string
   toggleTaskDone: (id: Doc<'tasks'>['_id']) => void
   footer?: ReactNode
 }) {
@@ -111,11 +106,6 @@ function DaySection({
             key={task._id}
             checked={task.status === 'done'}
             title={<Markdown content={task.title} inline />}
-            subtitle={
-              task.createdBy === profile?.userId
-                ? addedByYouLabel
-                : undefined
-            }
             onToggle={() => void toggleTaskDone(task._id)}
             onOpen={() => navigate(recordPath('task', task._id))}
           />
@@ -239,10 +229,9 @@ export default function Tasks() {
   const todayData = useToday(today, true)
   const tomorrowData = useToday(tomorrow)
   const upcoming = useUpcomingTasks(tomorrow)
-  const profile = useCurrentProfile()
   const toggleTaskDone = useToggleTaskDone()
 
-  if (!todayData || !tomorrowData || !profile) {
+  if (!todayData) {
     return (
       <>
         <TopBar dateLabel back={false} />
@@ -269,8 +258,6 @@ export default function Tasks() {
         heading={t('today.today')}
         date={today}
         data={todayData}
-        profile={profile}
-        addedByYouLabel={t('today.addedByYou')}
         toggleTaskDone={toggleTaskDone}
         footer={<InlineTaskComposer today={today} />}
       />
@@ -278,8 +265,6 @@ export default function Tasks() {
         heading={`${t('today.tomorrow')} · ${weekdayShort(tomorrow)}`}
         date={tomorrow}
         data={tomorrowData}
-        profile={profile}
-        addedByYouLabel={t('today.addedByYou')}
         toggleTaskDone={toggleTaskDone}
       />
 

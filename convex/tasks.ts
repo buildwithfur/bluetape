@@ -53,15 +53,27 @@ export const dueOnDate = query({
   },
   handler: async (ctx, args) => {
     await requireFamilyMember(ctx, args.familyId);
-    const pending = await ctx.db
+    const dueTasks = await ctx.db
       .query("tasks")
       .withIndex("status_dueDate", (q) =>
-        q.eq("familyId", args.familyId).eq("status", "pending"),
+        q
+          .eq("familyId", args.familyId)
+          .eq("status", "pending")
+          .eq("dueDate", args.date),
       )
       .collect();
-    return pending.filter((t) =>
-      t.dueDate === args.date || (args.includeUndatedTasks === true && !t.dueDate)
-    );
+    if (!args.includeUndatedTasks) return dueTasks;
+
+    const undatedTasks = await ctx.db
+      .query("tasks")
+      .withIndex("status_dueDate", (q) =>
+        q
+          .eq("familyId", args.familyId)
+          .eq("status", "pending")
+          .eq("dueDate", undefined),
+      )
+      .collect();
+    return [...undatedTasks, ...dueTasks];
   },
 });
 

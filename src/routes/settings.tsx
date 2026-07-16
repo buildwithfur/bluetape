@@ -17,7 +17,7 @@ export default function Settings() {
   if (!profile) {
     return (
       <>
-        <TopBar title={t('settings.title')} back backOnDesktop={false} />
+        <TopBar title={t('settings.language')} back backOnDesktop={false} />
         <EmptyState>{t('common.loading')}</EmptyState>
       </>
     )
@@ -42,13 +42,10 @@ export default function Settings() {
 
   return (
     <>
-      <TopBar title={t('settings.title')} back backOnDesktop={false} />
+      <TopBar title={t('settings.language')} back backOnDesktop={false} />
       <section className="border-t border-border-subtle">
         <div className="page-px pb-3 pt-5">
-          <h2 className="label-caps text-text-tertiary">{t('settings.language')}</h2>
-          <p className="mt-1 text-sm text-text-secondary">
-            {t('settings.languageDescription')}
-          </p>
+          <p className="text-sm text-text-secondary">{t('settings.languageDescription')}</p>
         </div>
         <ul className="border-t border-border-subtle">
           {supportedLocales.map((locale) => {

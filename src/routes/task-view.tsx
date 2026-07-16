@@ -185,14 +185,19 @@ export default function TaskView() {
               className="min-w-0 flex-1 rounded-xs border border-accent bg-surface px-2 py-1 text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink outline-none ring-2 ring-accent/20"
             />
           ) : canEdit ? (
-            <h1 className="min-w-0 flex-1">
-              <button
-                type="button"
-                onClick={() => setEditingTitle(true)}
-                className="line-clamp-2 w-full break-words rounded-xs px-2 py-1 text-left text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink transition hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 active:bg-surface-active"
-              >
-                {wikiPlainText(task.title)}
-              </button>
+            <h1
+              tabIndex={0}
+              onClick={(event) => {
+                if (!(event.target as Element).closest('a')) setEditingTitle(true)
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !(event.target as Element).closest('a')) {
+                  setEditingTitle(true)
+                }
+              }}
+              className="line-clamp-2 min-w-0 flex-1 cursor-text break-words rounded-xs px-2 py-1 text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink transition hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 active:bg-surface-active"
+            >
+              <Markdown content={task.title} inline />
             </h1>
           ) : (
             <h1 className="line-clamp-2 min-w-0 flex-1 break-words px-2 py-1 text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink">
@@ -227,17 +232,24 @@ export default function TaskView() {
               className="w-full resize-none rounded-xs border border-accent bg-surface px-3 py-2 text-[17px] leading-[1.6] text-text-primary outline-none ring-2 ring-accent/20"
             />
           ) : canEdit ? (
-            <button
-              type="button"
-              onClick={() => setEditingNote(true)}
-              className="min-h-11 w-full break-words rounded-xs px-2 py-2 text-left text-[17px] leading-[1.6] transition hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 active:bg-surface-active"
+            <div
+              tabIndex={0}
+              onClick={(event) => {
+                if (!(event.target as Element).closest('a')) setEditingNote(true)
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !(event.target as Element).closest('a')) {
+                  setEditingNote(true)
+                }
+              }}
+              className="min-h-11 w-full cursor-text break-words rounded-xs px-2 py-2 text-left text-[17px] leading-[1.6] transition hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 active:bg-surface-active"
             >
               {task.note ? (
-                <span className="text-text-primary">{wikiPlainText(task.note)}</span>
+                <Markdown content={task.note} className="break-words" />
               ) : (
                 <span className="text-text-tertiary">{t('record.notePlaceholder')}</span>
               )}
-            </button>
+            </div>
           ) : task.note ? (
             <Markdown content={task.note} className="break-words" />
           ) : null}

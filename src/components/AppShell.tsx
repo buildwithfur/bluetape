@@ -10,7 +10,7 @@ import {
   Scroll,
   Package,
   UsersThree,
-  GearSix,
+  Globe,
   SignOut,
 } from '@phosphor-icons/react'
 import type { ReactNode } from 'react'
@@ -36,7 +36,7 @@ const DESKTOP_TABS = [
   { to: '/shopping', icon: ShoppingCart, key: 'nav.shopping', exact: false },
   { to: '/more/rules', icon: Scroll, key: 'more.rules', exact: false },
   { to: '/more/items', icon: Package, key: 'more.items', exact: false },
-  { to: '/settings', icon: GearSix, key: 'settings.title', exact: false },
+  { to: '/language', icon: Globe, key: 'settings.language', exact: false },
 ] as const
 
 const FAMILY_TAB = {

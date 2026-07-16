@@ -96,7 +96,8 @@ export default function App() {
             <Route path="/more/rules" element={<Rules />} />
             <Route path="/more/items" element={<Items />} />
             <Route path="/family" element={<Family />} />
-            <Route path="/settings" element={<Settings />} />
+            <Route path="/language" element={<Settings />} />
+            <Route path="/settings" element={<Navigate to="/language" replace />} />
             <Route path="/p/:slug" element={<PageView />} />
             <Route path="/items/:id" element={<PageView recordType="item" />} />
             <Route path="/rules/:id" element={<PageView recordType="rule" />} />
