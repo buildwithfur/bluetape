@@ -36,6 +36,7 @@ export default function Family() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const family = useCurrentFamily()
+  const isOwner = family?.role === 'owner'
   const mine = useMyFamilies()
   const members = useListMembers(family?._id)
   const setRole = useSetMemberRole()
@@ -45,7 +46,7 @@ export default function Family() {
   const renameFamily = useRenameFamily()
   const deleteFamily = useDeleteFamily()
   const setCurrent = useSetCurrentFamily()
-  const apiKeys = useApiKeys(family?._id)
+  const apiKeys = useApiKeys(isOwner ? family?._id : undefined)
   const createApiKey = useCreateApiKey()
   const revokeApiKey = useRevokeApiKey()
 
@@ -69,7 +70,7 @@ export default function Family() {
     if (editingName) familyNameRef.current?.select()
   }, [editingName])
 
-  if (!family || !members || !mine || !apiKeys) {
+  if (!family || !members || !mine || (isOwner && !apiKeys)) {
     return (
       <>
         <TopBar title={t('family.title')} back backOnDesktop={false} />
@@ -78,7 +79,6 @@ export default function Family() {
     )
   }
 
-  const isOwner = family.role === 'owner'
   const inviteUrl = `${window.location.origin}/invite/${family.inviteToken}`
   const currentFamily = family
 
@@ -273,11 +273,11 @@ export default function Family() {
               <Plus size={16} aria-hidden="true" /> {t('action.create')}
             </Button>
           </form>
-          {!apiKeys.length ? (
+          {!apiKeys?.length ? (
             <EmptyState>{t('family.noApiKeys')}</EmptyState>
           ) : (
             <ul>
-              {apiKeys.map((k) => (
+              {apiKeys?.map((k) => (
                 <li
                   key={k._id}
                   className="border-b border-border-subtle last:border-b-0 page-px py-3 min-h-[56px] flex items-center justify-between gap-3"
