@@ -2,6 +2,7 @@ import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import en from './locales/en.json'
 import my from './locales/my.json'
+import id from './locales/id.json'
 import {
   SUPPORTED_LOCALES,
   type SupportedLocale,
@@ -10,6 +11,7 @@ import {
 const resources = {
   en: { translation: en },
   my: { translation: my },
+  id: { translation: id },
 } as const satisfies Record<SupportedLocale, { translation: Record<string, string> }>
 
 export type { SupportedLocale } from '@convex/supportedLocales'
