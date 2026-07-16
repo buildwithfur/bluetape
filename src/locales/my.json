@@ -92,6 +92,8 @@
   "page.newItem": "ပစ္စည်းအသစ်",
   "page.newRule": "စည်းမျဉ်းအသစ်",
   "page.newPage": "စာမျက်နှာအသစ်",
+  "rule.add": "စည်းမျဉ်း ထည့်ရန်",
+  "rule.titlePlaceholder": "စည်းမျဉ်း ခေါင်းစဉ်",
   "shopping.title": "ဈေးဝယ်စာရင်း",
   "shopping.addItem": "ပစ္စည်း ထည့်ရန်",
   "shopping.addPlaceholder": "ဝယ်ရန်လိုသောပစ္စည်း ထည့်ပါ",

@@ -92,6 +92,8 @@
   "page.newItem": "New item",
   "page.newRule": "New rule",
   "page.newPage": "New page",
+  "rule.add": "Add a rule",
+  "rule.titlePlaceholder": "Rule title",
   "shopping.title": "Shopping",
   "shopping.addItem": "Add item",
   "shopping.addPlaceholder": "Add what you need to buy",

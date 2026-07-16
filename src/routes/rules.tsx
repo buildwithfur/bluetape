@@ -1,9 +1,9 @@
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { Plus } from '@phosphor-icons/react'
 import { TopBar } from '@/components/AppShell'
 import { EmptyState } from '@/components/EmptyState'
 import { RoleGate } from '@/components/RoleGate'
+import { InlineRuleComposer } from '@/components/InlineRuleComposer'
 import { usePages } from '@/data/hooks'
 import { formatInSG } from '@/lib/date'
 import { pagePath } from '@/lib/record-route'
@@ -19,23 +19,9 @@ export default function Rules() {
         title={t('more.rules')}
         back
         backOnDesktop={false}
-        right={
-          <RoleGate allow={['admin']}>
-            <Link
-              to="/p/new?type=rule"
-              aria-label={t('page.newRule')}
-              className="inline-flex h-9 w-9 items-center justify-center gap-2 rounded-xs bg-accent px-0 text-sm font-medium text-text-on-accent hover:bg-accent-hover active:scale-95 transition sm:w-auto sm:px-3"
-            >
-              <Plus size={16} weight="bold" aria-hidden="true" />
-              <span className="sr-only sm:not-sr-only">{t('page.newRule')}</span>
-            </Link>
-          </RoleGate>
-        }
       />
       {!rules ? (
         <EmptyState>{t('common.loading')}</EmptyState>
-      ) : rules.length === 0 ? (
-        <EmptyState>{t('common.empty')}</EmptyState>
       ) : (
         <ul className="border-t border-border-subtle">
           {rules.map((p) => (
@@ -53,6 +39,9 @@ export default function Rules() {
               </Link>
             </li>
           ))}
+          <RoleGate allow={['admin']}>
+            <InlineRuleComposer />
+          </RoleGate>
         </ul>
       )}
     </>

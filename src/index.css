@@ -127,6 +127,14 @@ a,
 /* Long-form content cap */
 .prose-capped { max-width: 65ch; }
 
+/* Markdown code blocks often hold pasted household rules. Preserve their
+   formatting, but never let a long line escape the phone-width content area. */
+.prose-capped pre {
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *,
