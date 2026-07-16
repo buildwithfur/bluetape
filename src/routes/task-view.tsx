@@ -153,7 +153,7 @@ export default function TaskView() {
           </div>
         }
       />
-      <article className="page-px py-6">
+      <article className="page-px max-w-full overflow-x-clip py-6">
         <div className="flex items-start gap-3">
           <button
             type="button"
@@ -189,13 +189,13 @@ export default function TaskView() {
               <button
                 type="button"
                 onClick={() => setEditingTitle(true)}
-                className="w-full rounded-xs px-2 py-1 text-left text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink transition hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 active:bg-surface-active"
+                className="line-clamp-2 w-full break-words rounded-xs px-2 py-1 text-left text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink transition hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 active:bg-surface-active"
               >
                 {wikiPlainText(task.title)}
               </button>
             </h1>
           ) : (
-            <h1 className="min-w-0 px-2 py-1 text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink">
+            <h1 className="line-clamp-2 min-w-0 flex-1 break-words px-2 py-1 text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink">
               <Markdown content={task.title} inline />
             </h1>
           )}
@@ -230,7 +230,7 @@ export default function TaskView() {
             <button
               type="button"
               onClick={() => setEditingNote(true)}
-              className="min-h-11 w-full rounded-xs px-2 py-2 text-left text-[17px] leading-[1.6] transition hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 active:bg-surface-active"
+              className="min-h-11 w-full break-words rounded-xs px-2 py-2 text-left text-[17px] leading-[1.6] transition hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 active:bg-surface-active"
             >
               {task.note ? (
                 <span className="text-text-primary">{wikiPlainText(task.note)}</span>
@@ -239,7 +239,7 @@ export default function TaskView() {
               )}
             </button>
           ) : task.note ? (
-            <Markdown content={task.note} />
+            <Markdown content={task.note} className="break-words" />
           ) : null}
         </section>
 
