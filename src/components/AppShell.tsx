@@ -183,16 +183,17 @@ export function TopBar({
   const navigate = useNavigate()
   const search = useOptionalSearchPalette()
   return (
-    <header
-      className="sticky top-0 z-30 border-b border-border-subtle"
-      style={{
-        background: 'rgba(245,242,235,0.85)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-        paddingTop: 'env(safe-area-inset-top)',
-      }}
-    >
-      <div className="h-14 flex items-center gap-2 page-px">
+    <>
+      <header
+        className="fixed inset-x-0 top-0 z-30 border-b border-border-subtle md:sticky md:inset-x-auto"
+        style={{
+          background: 'rgba(245,242,235,0.85)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          paddingTop: 'env(safe-area-inset-top)',
+        }}
+      >
+        <div className="h-14 flex items-center gap-2 page-px">
         {back ? (
           <>
             <button
@@ -238,8 +239,15 @@ export function TopBar({
             <MagnifyingGlass size={22} aria-hidden="true" />
           </button>
         )}
-      </div>
-    </header>
+        </div>
+      </header>
+      {/* Fixed mobile chrome needs its own layout space so page content starts below it. */}
+      <div
+        className="md:hidden"
+        aria-hidden="true"
+        style={{ height: 'calc(3.5rem + env(safe-area-inset-top))' }}
+      />
+    </>
   )
 }
 
@@ -263,7 +271,7 @@ export function AppShell({
         <main
           className={cn(
             'flex-1 min-w-0 w-full',
-            showChrome && 'pb-14 md:pb-0',
+            showChrome && 'pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0',
           )}
         >
           {children}
