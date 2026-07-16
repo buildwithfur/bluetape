@@ -1,7 +1,7 @@
 /** Shared TS types not provided by Convex codegen. */
 import type { Doc } from '@convex/_generated/dataModel'
 
-export type Role = 'admin' | 'helper'
+export type Role = 'admin' | 'user'
 export type PageType = 'item' | 'rule'
 export type Frequency = 'daily' | 'weekly' | 'monthly'
 

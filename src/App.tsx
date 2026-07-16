@@ -94,11 +94,13 @@ export default function App() {
             <Route path="/shopping/:id" element={<ShoppingItemView />} />
             <Route path="/more" element={<More />} />
             <Route path="/more/rules" element={<Rules />} />
-            <Route path="/more/items" element={<Items />} />
+            <Route path="/more/notes" element={<Items />} />
+            <Route path="/more/items" element={<Navigate to="/more/notes" replace />} />
             <Route path="/family" element={<Family />} />
             <Route path="/language" element={<Settings />} />
             <Route path="/settings" element={<Navigate to="/language" replace />} />
             <Route path="/p/:slug" element={<PageView />} />
+            <Route path="/notes/:id" element={<PageView recordType="item" />} />
             <Route path="/items/:id" element={<PageView recordType="item" />} />
             <Route path="/rules/:id" element={<PageView recordType="rule" />} />
             <Route path="/p/new" element={<PageEdit />} />

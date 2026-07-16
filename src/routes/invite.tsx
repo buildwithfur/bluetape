@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useInviteFamily, useAcceptInvite, useCurrentProfile } from '@/data/hooks'
@@ -8,7 +8,7 @@ import { EmptyState } from '@/components/EmptyState'
 
 /** /invite/:token — if signed in, show the family name + a Join button;
  * if not, redirect to login with a return path. Joining always adds the
- * user as a "helper" — the owner promotes if desired (no self-assign). */
+ * user with the "user" role — the owner promotes if desired (no self-assign). */
 export function InviteAccept() {
   const { t } = useTranslation()
   const { token = '' } = useParams()
@@ -18,13 +18,29 @@ export function InviteAccept() {
   const acceptInvite = useAcceptInvite()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const handledExistingMembership = useRef(false)
 
   // Not signed in → bounce to login, preserving the invite URL.
   useEffect(() => {
     if (profile === null) navigate('/login', { replace: true, state: { from: `/invite/${token}` } })
   }, [profile, navigate, token])
 
-  if (profile === undefined || family === undefined) {
+  // Reopening an invite for a family the user already belongs to should take
+  // them into that family, not ask them to join again.
+  useEffect(() => {
+    if (!profile || !family?.isMember || handledExistingMembership.current) return
+    handledExistingMembership.current = true
+    setBusy(true)
+    void acceptInvite(token)
+      .then(() => navigate('/', { replace: true }))
+      .catch((err) => {
+        handledExistingMembership.current = false
+        setError(err instanceof Error ? err.message : String(err))
+        setBusy(false)
+      })
+  }, [family?.isMember, profile, token, navigate, acceptInvite])
+
+  if (profile === undefined || family === undefined || family?.isMember) {
     return (
       <>
         <TopBar title={t('invite.title')} showSearch={false} />

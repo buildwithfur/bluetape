@@ -1,7 +1,7 @@
 ---
 version: alpha
 name: Bluetape
-description: A warm, editorial household coordination app for a helper and her employer. Feels like printed paper sitting on a warm desk.
+description: A warm, editorial household coordination app for household users and admins. Feels like printed paper sitting on a warm desk.
 colors:
   # Foundation — warm paper, no stark white
   background: "#F5F2EB"
@@ -197,9 +197,9 @@ components:
 
 ## Overview
 
-Bluetape is a household coordination app used primarily by a helper on her phone every morning, and secondarily by her employer to manage content. It coordinates routines, one-off tasks, a wiki of household items (with helper-language translations and photos), rules, and a shared grocery list — all interconnected by wiki-style `[[links]]`.
+Bluetape is a household coordination app used primarily by a household user on their phone every morning, and secondarily by an admin to manage content. It coordinates routines, one-off tasks, household notes (with optional photos and local-language translations), rules, and a shared grocery list — all interconnected by wiki-style `[[links]]`.
 
-The physical scene: a phone held in a kitchen, sometimes under fluorescent light, sometimes bright tropical daylight. The user opens it to see what to do today, taps through to reference items, and marks work done. She may not be fluent in English.
+The physical scene: a phone held in a kitchen, sometimes under fluorescent light, sometimes bright tropical daylight. The user opens it to see what to do today, taps through to reference notes, and marks work done. They may not be fluent in English.
 
 The product should feel like **printed paper sitting on a warm desk**. Warm. Editorial. Premium. Technical. Not a cold SaaS dashboard. Restraint is the brand: warm neutral paper, navy ink, and a single orange accent that reads as signal — a heartbeat, never a shout. The interface must be calm enough that a stressed worker on her sixth task of the day can still parse it at a glance, and legible enough that a non-native English reader can navigate by photo and structure alone. Photos of household products pop against the cream; local-language script reads at full size.
 
@@ -224,13 +224,13 @@ The palette is a single warm-neutral foundation, navy ink for permanence, and or
 
 ## Typography
 
-Typography is bilingual: **Satoshi** (geometric grotesque, via Fontshare) for English/UI, and **Noto Sans** for the helper-language script. **JetBrains Mono** is reserved for dates, counts, and metadata — an editorial-technical signal.
+Typography is bilingual: **Satoshi** (geometric grotesque, via Fontshare) for English/UI, and **Noto Sans** for the local-language script. **JetBrains Mono** is reserved for dates, counts, and metadata — an editorial-technical signal.
 
 - **Headlines** — Satoshi Semi-Bold (600) at 30px for page titles, with `-0.02em` tracking. Tight but not cramped. `text-wrap: balance` on H1–H3 for even line lengths.
 - **Body** — Satoshi Regular (400) at 16px, line-height 1.5, capped at 65ch on long-form content such as rules.
 - **Labels (uppercase)** — Satoshi Medium (500) at 11px, `+0.1em` letter-spacing, tertiary color. Used for type badges, section labels, and tab labels. Used sparingly — never as a reflexive eyebrow above every section.
 - **Mono** — JetBrains Mono for dates ("Tue · 7 Jul"), counts ("3/7"), and quantified metadata. Restrained; feels like printed reference data.
-- **Helper-language text** — Noto Sans at 24px, weight 500. Rendered inline in the content flow, not boxed. The script is large enough to be legible to a non-Latin reader at arm's length.
+- **Local-language text** — Noto Sans at 24px, weight 500. Rendered inline in the content flow, not boxed. The script is large enough to be legible to a non-Latin reader at arm's length.
 
 **Forbidden fonts:** Geist, Inter, and the AI-default sans stack. They are the tell of a vibe-coded UI in 2025-2026. Satoshi (or a native system stack as fallback) is the brand voice.
 
@@ -280,7 +280,7 @@ Radius scale: `xs 8px` · `sm 12px` · `md 20px` · `lg 28px` (overlays only) ·
 - **List Row.** Full-width tappable row, `min-height: 56px` (above the 44px a11y floor for easy thumb use). `surface` background, `border-subtle` bottom hairline. Tap target is the whole row. Hover: `surface-hover`. Active: `surface-active` + `scale(0.98)`.
 - **Checkbox — Done.** A circular outline; checked state is a filled circle in `success-accent`. No green tile or banner — green appears *only* on this 16px circle. The accompanying text gets a subtle strikethrough that fades in over 150ms.
 - **Top Bar.** Sticky, translucent `background` (`rgba(245,242,235,0.85)`) + `backdrop-filter: blur(12px)`, with a `border-subtle` bottom hairline. Holds a back `Ghost` button on the left and contextual actions on the right.
-- **Helper-Language Name Block.** Inline in content flow — a `label-caps` "Helper-language name" label, then the script at 24px in `ink`. No border, no background, no nesting.
+- **Local-Language Name Block.** Inline in content flow — a `label-caps` "Local-language name" label, then the script at 24px in `ink`. No border, no background, no nesting.
 - **Warning Callout.** Used for rule reminders on the Today screen. `warning-bg` background, `warning-text` text, no border. Reads as a quiet printed sticky note.
 - **Photo Frame.** A real image frame: 1px `border` hairline, `20px` radius, `aspect-ratio: 4/3`. Not a content container — it mounts a photo on the page.
 
@@ -291,7 +291,7 @@ Radius scale: `xs 8px` · `sm 12px` · `md 20px` · `lg 28px` (overlays only) ·
 - Maintain WCAG AA contrast (4.5:1 body, 3:1 large/bold). Use `navy-700` (`#173C68`) for wiki link text.
 - Let content live in the page flow with hairline dividers, not in nested boxes.
 - Use a 1px hairline border *or* a defined shadow — never both as decoration.
-- Tap targets ≥44px; list rows ≥56px for the helper's thumb.
+- Tap targets ≥44px; list rows ≥56px for comfortable one-handed use.
 - Animate with `transform` and `opacity` only, `120ms` ease-out. Include `prefers-reduced-motion` fallbacks.
 - Use Noto Sans at ≥22px so the script is legible at arm's length.
 - Render broken wiki links with a dashed underline so unmade pages are visible but quiet.

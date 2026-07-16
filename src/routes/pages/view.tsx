@@ -46,6 +46,8 @@ export default function PageView({ recordType }: { recordType?: PageType }) {
   const generateUploadUrl = useGenerateUploadUrl()
   const deleteRule = useDeleteRule()
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState(false)
   const [, setCopied] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
   const [editingContent, setEditingContent] = useState(false)
@@ -381,19 +383,37 @@ export default function PageView({ recordType }: { recordType?: PageType }) {
       {/* Delete confirmation */}
       <BottomSheet
         open={confirmDelete}
-        onClose={() => setConfirmDelete(false)}
+        onClose={() => {
+          setConfirmDelete(false)
+          setDeleteError(false)
+        }}
         title={t('action.delete')}
         footer={
           <>
-            <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setConfirmDelete(false)
+                setDeleteError(false)
+              }}
+            >
               {t('action.cancel')}
             </Button>
             <Button
-              variant="primary"
+              variant="danger"
+              disabled={deleting}
               onClick={async () => {
-                if (!isAdmin || !isRule) return
-                await deleteRule(page._id)
-                navigate('/more/rules')
+                if (!isAdmin || !isRule || deleting) return
+                setDeleting(true)
+                setDeleteError(false)
+                try {
+                  await deleteRule(page._id)
+                  navigate('/more/rules', { replace: true })
+                } catch {
+                  setDeleteError(true)
+                } finally {
+                  setDeleting(false)
+                }
               }}
             >
               {t('action.delete')}
@@ -401,7 +421,14 @@ export default function PageView({ recordType }: { recordType?: PageType }) {
           </>
         }
       >
-        {t('common.confirmDeleteRule')}
+        <div className="space-y-3">
+          <p>{t('common.confirmDeleteRule')}</p>
+          {deleteError && (
+            <p role="alert" className="text-sm text-error-accent">
+              {t('common.deleteRuleFailed')}
+            </p>
+          )}
+        </div>
       </BottomSheet>
     </>
   )

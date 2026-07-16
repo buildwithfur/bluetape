@@ -36,7 +36,7 @@ export function BottomSheet({
   if (!open) return null
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex md:items-center md:justify-center">
+    <div className="fixed inset-0 z-50 flex items-end justify-center md:items-center">
       <button
         type="button"
         aria-label={t('action.close')}

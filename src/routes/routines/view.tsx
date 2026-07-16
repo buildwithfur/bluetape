@@ -1,12 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { Trash } from '@phosphor-icons/react'
 import { TopBar } from '@/components/AppShell'
+import { BottomSheet } from '@/components/BottomSheet'
+import { Button } from '@/components/Button'
 import { EmptyState } from '@/components/EmptyState'
 import { Markdown } from '@/components/Markdown'
+import { OverflowMenu } from '@/components/OverflowMenu'
 import { ShareButton } from '@/components/ShareButton'
 import {
   useCurrentRole,
+  useDeleteRoutine,
   useAllPages,
   usePageById,
   useRoutine,
@@ -19,10 +24,12 @@ import { wikiAuthoringText, wikiPlainText } from '@/lib/wiki'
 export default function RoutineView() {
   const { t } = useTranslation()
   const { id } = useParams()
+  const navigate = useNavigate()
   const routine = useRoutine(id)
   const allPages = useAllPages()
   const linkedPage = usePageById(routine?.pageId)
   const updateDetails = useUpdateRoutineDetails()
+  const deleteRoutine = useDeleteRoutine()
   const role = useCurrentRole()
   const canManage = role === 'admin' || role === 'owner'
   const [editingTitle, setEditingTitle] = useState(false)
@@ -30,6 +37,9 @@ export default function RoutineView() {
   const [titleDraft, setTitleDraft] = useState('')
   const [noteDraft, setNoteDraft] = useState('')
   const [saveError, setSaveError] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState(false)
   const titleInputRef = useRef<HTMLInputElement>(null)
   const noteInputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -119,7 +129,30 @@ export default function RoutineView() {
         title={t('routine.detail')}
         back
         showSearch={false}
-        right={<ShareButton path={recordPath('routine', routine._id)} title={wikiPlainText(routine.title)} />}
+        right={
+          <div className="flex items-center">
+            <ShareButton path={recordPath('routine', routine._id)} title={wikiPlainText(routine.title)} />
+            {canManage && (
+              <OverflowMenu>
+                {(close) => (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      close()
+                      setDeleteError(false)
+                      setConfirmDelete(true)
+                    }}
+                    className="flex h-11 w-full items-center gap-3 rounded-xs px-3 text-error-accent transition hover:bg-error-bg active:bg-error-bg"
+                  >
+                    <Trash size={19} aria-hidden="true" />
+                    {t('action.delete')}
+                  </button>
+                )}
+              </OverflowMenu>
+            )}
+          </div>
+        }
       />
       <article className="page-px py-6">
         <div>
@@ -213,6 +246,56 @@ export default function RoutineView() {
         )}
 
       </article>
+
+      <BottomSheet
+        open={confirmDelete}
+        onClose={() => {
+          setConfirmDelete(false)
+          setDeleteError(false)
+        }}
+        title={t('action.delete')}
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setConfirmDelete(false)
+                setDeleteError(false)
+              }}
+            >
+              {t('action.cancel')}
+            </Button>
+            <Button
+              variant="danger"
+              disabled={deleting}
+              onClick={async () => {
+                if (!canManage || deleting) return
+                setDeleting(true)
+                setDeleteError(false)
+                try {
+                  await deleteRoutine(routine._id)
+                  navigate('/routines', { replace: true })
+                } catch {
+                  setDeleteError(true)
+                } finally {
+                  setDeleting(false)
+                }
+              }}
+            >
+              {t('action.delete')}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <p>{t('common.confirmDeleteRoutine')}</p>
+          {deleteError && (
+            <p role="alert" className="text-sm text-error-accent">
+              {t('common.deleteRoutineFailed')}
+            </p>
+          )}
+        </div>
+      </BottomSheet>
     </>
   )
 }

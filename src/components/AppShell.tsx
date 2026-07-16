@@ -8,7 +8,7 @@ import {
   MagnifyingGlass,
   ArrowLeft,
   Scroll,
-  Package,
+  NoteBlank,
   UsersThree,
   Globe,
   SignOut,
@@ -35,7 +35,7 @@ const DESKTOP_TABS = [
   { to: '/routines', icon: CalendarDots, key: 'nav.routines', exact: false },
   { to: '/shopping', icon: ShoppingCart, key: 'nav.shopping', exact: false },
   { to: '/more/rules', icon: Scroll, key: 'more.rules', exact: false },
-  { to: '/more/items', icon: Package, key: 'more.items', exact: false },
+  { to: '/more/notes', icon: NoteBlank, key: 'more.items', exact: false },
   { to: '/language', icon: Globe, key: 'settings.language', exact: false },
 ] as const
 

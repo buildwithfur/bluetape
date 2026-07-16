@@ -53,7 +53,7 @@ On every authenticated API request, Bluetape must:
 1. Hash and resolve the bearer token to an active API-key document.
 2. Resolve `apiKey.createdBy` as the acting user.
 3. Verify that user is still a member of `apiKey.familyId`.
-4. Derive the user's **current** family role (`owner`, `admin`, or `helper`).
+4. Derive the user's **current** family role (`owner`, `admin`, or `user`).
 5. Enforce the permission required by the requested operation.
 6. Attribute entity changes to the real user.
 7. Record the exact `apiKeyId` in the API audit trail.
@@ -63,7 +63,7 @@ Do not copy a role onto the API-key document. A stored role snapshot would becom
 ### Role changes apply immediately
 
 - Promoting a user immediately expands what their existing keys may do.
-- Demoting an admin to helper immediately reduces what their existing keys may do.
+- Demoting an admin to user immediately reduces what their existing keys may do.
 - Removing a user from the family makes all of that user's keys for the family unusable.
 - Revoking one key disables only that key.
 - Switching the user's current UI family does not retarget a key; the key remains bound to its original family.
@@ -74,15 +74,15 @@ Do not copy a role onto the API-key document. A stored role snapshot would becom
 |---|---|---|---|
 | Family owner | All keys in the family | Own key | Any family key |
 | Family admin | Own keys only | Own key | Own keys only |
-| Helper | No key-management UI in this iteration | No | No |
+| User | No key-management UI in this iteration | No | No |
 
-The runtime authorization design must still support a helper-owned key later without another backend redesign. If helper key creation is enabled later, that key will inherit helper permissions automatically.
+The runtime authorization design must still support a user-owned key later without another backend redesign. If user key creation is enabled later, that key will inherit user permissions automatically.
 
 ### API operation permissions
 
 Match the existing app permission model rather than granting blanket API-admin access:
 
-| Operation | Helper | Admin | Owner |
+| Operation | User | Admin | Owner |
 |---|---:|---:|---:|
 | Read family content | Yes | Yes | Yes |
 | Create one-off task | Yes | Yes | Yes |
@@ -241,7 +241,7 @@ Do not remove `resolveAgentInFamily` from all operations until this slice passes
    ```
 
 2. Create the Convex test module loader in `convex/test.setup.ts` using `convex-test` and the generated schema.
-3. Add fixture helpers that create auth users, user profiles, one family, and owner/admin/helper memberships.
+3. Add fixture utilities that create auth users, user profiles, one family, and owner/admin/user memberships.
 4. Write a baseline test that proves the current owner can create a key and that only the hash—not plaintext—is stored.
 5. Run:
 
@@ -315,14 +315,14 @@ type ApiPrincipal = {
   apiKeyId: Id<"apiKeys">;
   familyId: Id<"families">;
   userId: Id<"users">;
-  role: "owner" | "admin" | "helper";
+  role: "owner" | "admin" | "user";
   label: string | null;
 };
 ```
 
 **Steps:**
 
-1. Write failing tests covering owner, admin, helper, revoked key, removed member, and cross-family behavior.
+1. Write failing tests covering owner, admin, user, revoked key, removed member, and cross-family behavior.
 2. Implement `requireApiPrincipal(ctx, apiKeyId)`:
    - load the key by ID
    - reject missing/revoked keys as unauthorized
@@ -360,7 +360,7 @@ type ApiPrincipal = {
    - admin can create and revoke their own key
    - admin cannot revoke another user's key
    - owner can revoke any family key
-   - helper is denied key management
+   - user is denied key management
 2. Replace blanket `requireFamilyOwner` calls:
    - list: resolve current family member; owner returns all, admin filters to own
    - create: require owner/admin and store the caller as `createdBy`
@@ -527,7 +527,7 @@ type ApiPrincipal = {
 
 - one family owner
 - one non-owner admin
-- one helper
+- one user
 - optionally a second family to test isolation
 
 **Scenarios:**
@@ -539,9 +539,9 @@ type ApiPrincipal = {
    - task `createdBy` equals the admin user ID
    - audit event references the same admin and exact key ID
 5. Use the same key to create a routine; verify success while the user is admin.
-6. Demote that user to helper.
+6. Demote that member to user.
 7. Retry routine creation; verify `403` plus a denied audit event.
-8. Use the same key for a helper-permitted action such as adding a shopping item; verify success and real-user attribution.
+8. Use the same key for a user-permitted action such as adding a shopping item; verify success and real-user attribution.
 9. Remove the user from the family; verify the key returns `403` for all family operations.
 10. Revoke another admin's key as the owner; verify it returns `401` afterward.
 11. Attempt cross-family access; verify the request cannot select or infer another family.

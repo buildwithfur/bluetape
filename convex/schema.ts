@@ -30,7 +30,7 @@ export default defineSchema({
   familyMembers: defineTable({
     familyId: v.id("families"),
     userId: v.id("users"),
-    role: v.union(v.literal("admin"), v.literal("helper")),
+    role: v.union(v.literal("admin"), v.literal("user")),
     displayName: v.string(),
     joinedAt: v.number(),
     invitedBy: v.optional(v.id("users")),

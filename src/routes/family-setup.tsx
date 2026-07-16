@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next'
 
 /** Shown when a user has a profile but no family yet. They either create
  * one (becoming the owner) or join one via invite link. Role is never
- * self-assigned: creators become owner/admin; invitees join as helper. */
+ * self-assigned: creators become owner/admin; invitees join as users. */
 export function FamilySetup() {
   const { t } = useTranslation()
   const navigate = useNavigate()
