@@ -304,7 +304,7 @@ export default function PageView({ recordType }: { recordType?: PageType }) {
               </span>
             </div>
           )}
-          <div className="mono-sm text-text-tertiary mt-2">
+          <div className="mono-sm text-text-tertiary mt-2 hidden md:block">
             {t('page.updated', { date: formatInSG(page.updatedAt, { day: 'numeric', month: 'short' }) })}
           </div>
         </header>
@@ -369,6 +369,12 @@ export default function PageView({ recordType }: { recordType?: PageType }) {
             />
           </div>
         )}
+
+        <div className="page-px pb-6 pt-2 md:hidden">
+          <div className="mono-sm text-text-tertiary">
+            {t('page.updated', { date: formatInSG(page.updatedAt, { day: 'numeric', month: 'short' }) })}
+          </div>
+        </div>
 
       </article>
 

@@ -14,7 +14,6 @@ import {
   useUnmarkGroceryBought,
   useShopping,
 } from '@/data/hooks'
-import { formatInSG } from '@/lib/date'
 import { recordPath } from '@/lib/record-route'
 import { groceryCount } from '@/lib/shopping'
 
@@ -66,7 +65,7 @@ export default function Shopping() {
           return (
             <li
               key={item._id}
-              className="flex min-h-[72px] items-center border-b border-border-subtle page-px"
+              className="flex min-h-14 items-center border-b border-border-subtle page-px"
             >
               <button
                 type="button"
@@ -102,11 +101,6 @@ export default function Shopping() {
                     ? 'block truncate text-[16px] text-text-tertiary line-through'
                     : 'block truncate text-[16px] text-text-primary'}
                 />
-                <div className="mono-sm mt-0.5 text-text-tertiary">
-                  {t('shopping.added', {
-                    date: formatInSG(item.createdAt, { day: 'numeric', month: 'short' }),
-                  })}
-                </div>
               </div>
 
               <div className="ml-2 flex shrink-0 items-center" aria-label={t('shopping.quantity')}>

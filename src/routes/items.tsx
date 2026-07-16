@@ -4,7 +4,6 @@ import { Plus } from '@phosphor-icons/react'
 import { TopBar } from '@/components/AppShell'
 import { EmptyState } from '@/components/EmptyState'
 import { usePages } from '@/data/hooks'
-import { formatInSG } from '@/lib/date'
 import { pagePath } from '@/lib/record-route'
 
 /** Catalog of item pages — both users can create (§6.6). */
@@ -41,21 +40,16 @@ export default function Items() {
                 to={pagePath(p)}
                 className="block page-px py-3 min-h-[56px] active:bg-surface-hover transition-colors"
               >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-[16px] text-text-primary truncate">{p.title}</div>
-                    {p.localName && (
-                      <div className="font-local-script text-[18px] text-ink" style={{ fontFamily: 'var(--font-local-script)' }}>
-                        {p.localName}
-                      </div>
-                    )}
-                    {p.location && (
-                      <div className="mono-sm text-text-tertiary">{p.location}</div>
-                    )}
-                  </div>
-                  <span className="mono-sm text-text-tertiary whitespace-nowrap">
-                    {formatInSG(p.updatedAt, { day: 'numeric', month: 'short' })}
-                  </span>
+                <div className="min-w-0">
+                  <div className="text-[16px] text-text-primary truncate">{p.title}</div>
+                  {p.localName && (
+                    <div className="font-local-script text-[18px] text-ink" style={{ fontFamily: 'var(--font-local-script)' }}>
+                      {p.localName}
+                    </div>
+                  )}
+                  {p.location && (
+                    <div className="mono-sm text-text-tertiary">{p.location}</div>
+                  )}
                 </div>
               </Link>
             </li>

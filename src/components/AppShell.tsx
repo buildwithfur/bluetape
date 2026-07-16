@@ -15,6 +15,7 @@ import {
 } from '@phosphor-icons/react'
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/cn'
+import { appVersion } from '@/lib/app-version'
 import { useOptionalSearchPalette } from './SearchContext'
 import { todayLabel } from '@/lib/date'
 import { useCurrentRole, useNavigationWarmup } from '@/data/hooks'
@@ -147,6 +148,9 @@ export function SideRail() {
         })}
       </ul>
       <div className="mt-auto px-3 pb-4">
+        <p className="px-3 pb-2 mono-sm text-text-tertiary">
+          {t('more.version', { version: appVersion })}
+        </p>
         <button
           type="button"
           onClick={async () => {

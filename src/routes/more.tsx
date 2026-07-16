@@ -4,6 +4,7 @@ import { CaretRight, SignOut } from '@phosphor-icons/react'
 import { TopBar } from '@/components/AppShell'
 import { useAuthActions } from '@convex-dev/auth/react'
 import { useCurrentRole } from '@/data/hooks'
+import { appVersion } from '@/lib/app-version'
 
 export default function More() {
   const { t } = useTranslation()
@@ -56,6 +57,9 @@ export default function More() {
           </button>
         </li>
       </ul>
+      <p className="page-px py-4 text-center mono-sm text-text-tertiary md:hidden">
+        {t('more.version', { version: appVersion })}
+      </p>
     </>
   )
 }

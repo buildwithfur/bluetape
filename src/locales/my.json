@@ -159,6 +159,7 @@
   "more.itemsHint": "ဓာတ်ပုံ ပါသော အိမ်သုံးပစ္စည်းများ။",
   "more.family": "မိသားစု",
   "more.familyHint": "အဖွဲ့ဝင်များ၊ ဖိတ်ကြားလင့်ခ်နှင့် ရာထူးများ။",
+  "more.version": "ဗားရှင်း {{version}}",
   "settings.title": "ဆက်တင်များ",
   "settings.hint": "ဘာသာစကားနှင့် ကိုယ်ပိုင်ရွေးချယ်မှုများ။",
   "settings.language": "ဘာသာစကား",

@@ -159,6 +159,7 @@
   "more.itemsHint": "Barang rumah tangga dengan foto.",
   "more.family": "Keluarga",
   "more.familyHint": "Anggota, tautan undangan, dan peran.",
+  "more.version": "Versi {{version}}",
   "settings.title": "Pengaturan",
   "settings.hint": "Bahasa dan preferensi pribadi.",
   "settings.language": "Bahasa",

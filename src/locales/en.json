@@ -159,6 +159,7 @@
   "more.itemsHint": "Products around the house with photos.",
   "more.family": "Family",
   "more.familyHint": "Members, invite link, and roles.",
+  "more.version": "Version {{version}}",
   "settings.title": "Settings",
   "settings.hint": "Language and personal preferences.",
   "settings.language": "Language",
