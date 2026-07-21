@@ -19,6 +19,7 @@ import {
   useToggleTaskDone,
   useUpdateTaskDetails,
 } from '@/data/hooks'
+import { useLocalizedTaskFields } from '@/data/useLocalizedFields'
 import { dateLabel, formatInSG } from '@/lib/date'
 import { recordPath } from '@/lib/record-route'
 import { wikiAuthoringText, wikiPlainText } from '@/lib/wiki'
@@ -42,6 +43,7 @@ export default function TaskView() {
   const [titleDraft, setTitleDraft] = useState('')
   const [noteDraft, setNoteDraft] = useState('')
   const [saveError, setSaveError] = useState(false)
+  const [showOriginal, setShowOriginal] = useState(false)
   const titleInputRef = useRef<HTMLInputElement>(null)
   const noteInputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -51,6 +53,24 @@ export default function TaskView() {
   const authoringNote = task && allPages
     ? wikiAuthoringText(task.note ?? '', allPages)
     : task?.note ?? ''
+  const localized = useLocalizedTaskFields(
+    task
+      ? [
+          {
+            entityType: 'task',
+            entityId: task._id,
+            field: 'title',
+            source: task.title,
+          },
+          {
+            entityType: 'task',
+            entityId: task._id,
+            field: 'note',
+            source: task.note ?? '',
+          },
+        ]
+      : [],
+  )
 
   useEffect(() => {
     if (!editingTitle) setTitleDraft(authoringTitle)
@@ -67,6 +87,10 @@ export default function TaskView() {
   useEffect(() => {
     if (editingNote) noteInputRef.current?.focus()
   }, [editingNote])
+
+  useEffect(() => {
+    setShowOriginal(false)
+  }, [task?._id, task?.title, task?.note, profile?.locale])
 
   if (task === undefined) {
     return (
@@ -86,6 +110,15 @@ export default function TaskView() {
   }
 
   const taskId = task._id
+  const displayTitle = showOriginal
+    ? task.title
+    : localized.textFor(task._id, 'title', task.title)
+  const displayNote = showOriginal
+    ? task.note ?? ''
+    : localized.textFor(task._id, 'note', task.note ?? '')
+  const hasTranslation =
+    localized.hasTranslation(task._id, 'title') ||
+    localized.hasTranslation(task._id, 'note')
   const canEdit = role === 'owner' || role === 'admin'
   const canDelete = canEdit || profile?.userId === task.createdBy
 
@@ -197,11 +230,11 @@ export default function TaskView() {
               }}
               className="line-clamp-2 min-w-0 flex-1 cursor-text break-words rounded-xs px-2 py-1 text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink transition hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 active:bg-surface-active"
             >
-              <Markdown content={task.title} inline />
+              <Markdown content={displayTitle} inline />
             </h1>
           ) : (
             <h1 className="line-clamp-2 min-w-0 flex-1 break-words px-2 py-1 text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink">
-              <Markdown content={task.title} inline />
+              <Markdown content={displayTitle} inline />
             </h1>
           )}
         </div>
@@ -211,6 +244,16 @@ export default function TaskView() {
             <span>{t('record.due', { date: dateLabel(task.dueDate) })}</span>
           )}
         </div>
+        {hasTranslation && (
+          <button
+            type="button"
+            onClick={() => setShowOriginal((value) => !value)}
+            aria-pressed={showOriginal}
+            className="mt-3 min-h-11 rounded-xs px-2 text-sm font-medium text-accent transition hover:bg-accent-bg active:bg-surface-active"
+          >
+            {t(showOriginal ? 'translation.showTranslation' : 'translation.showOriginal')}
+          </button>
+        )}
 
         <section className="mt-6 border-t border-border-subtle pt-5">
           <div className="label-caps mb-2 text-text-tertiary">{t('record.note')}</div>
@@ -245,13 +288,13 @@ export default function TaskView() {
               className="min-h-11 w-full cursor-text break-words rounded-xs px-2 py-2 text-left text-[17px] leading-[1.6] transition hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 active:bg-surface-active"
             >
               {task.note ? (
-                <Markdown content={task.note} className="break-words" />
+                <Markdown content={displayNote} className="break-words" />
               ) : (
                 <span className="text-text-tertiary">{t('record.notePlaceholder')}</span>
               )}
             </div>
           ) : task.note ? (
-            <Markdown content={task.note} className="break-words" />
+            <Markdown content={displayNote} className="break-words" />
           ) : null}
         </section>
 

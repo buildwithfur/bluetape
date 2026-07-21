@@ -3,6 +3,7 @@ import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { auth } from "./auth";
 import type { Id } from "./_generated/dataModel";
+import { sha256Hex } from "./lib/sha256";
 
 const http = httpRouter();
 
@@ -79,15 +80,6 @@ http.route({
 });
 
 // ─── Authentication ───────────────────────────────────────────────────
-
-/** SHA-256 of a string → lowercase hex (matches apiKeys.ts `sha256Hex`). */
-async function sha256Hex(input: string): Promise<string> {
-  const data = new TextEncoder().encode(input);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(digest), (b) =>
-    b.toString(16).padStart(2, "0"),
-  ).join("");
-}
 
 /**
  * Authenticate the request and resolve the family the key is bound to.

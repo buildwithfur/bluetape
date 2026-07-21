@@ -14,6 +14,7 @@ import {
   useToggleRoutineCompletion,
   useToggleTaskDone,
 } from '@/data/hooks'
+import { useLocalizedTaskFields } from '@/data/useLocalizedFields'
 import { cn } from '@/lib/cn'
 import type { Doc } from '@convex/_generated/dataModel'
 import { todayInSG, addDaysISO, dateLabel, weekdayShort, weekdayName } from '@/lib/date'
@@ -77,14 +78,23 @@ function DaySection({
   footer?: ReactNode
 }) {
   const navigate = useNavigate()
-  if (!data) return null
 
   // Ad-hoc tasks (no dueDate) belong to today only — for any other day,
   // only show tasks explicitly due on that date.
   const isToday = date === todayInSG()
   const tasks = isToday
-    ? data.tasks
-    : data.tasks.filter((t) => t.dueDate === date)
+    ? data?.tasks ?? []
+    : data?.tasks.filter((t) => t.dueDate === date) ?? []
+  const localized = useLocalizedTaskFields(
+    tasks.map((task) => ({
+      entityType: 'task',
+      entityId: task._id,
+      field: 'title',
+      source: task.title,
+    })),
+  )
+
+  if (!data) return null
 
   const hasRows = data.routines.length > 0 || tasks.length > 0 || footer
   if (!hasRows) return null
@@ -105,7 +115,9 @@ function DaySection({
           <CheckRow
             key={task._id}
             checked={task.status === 'done'}
-            title={<Markdown content={task.title} inline />}
+            title={
+              <Markdown content={localized.textFor(task._id, 'title', task.title)} inline />
+            }
             onToggle={() => void toggleTaskDone(task._id)}
             onOpen={() => navigate(recordPath('task', task._id))}
           />

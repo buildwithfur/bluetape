@@ -155,8 +155,82 @@ export default defineSchema({
     locale: v.string(),
     timezone: v.string(),
     currentFamilyId: v.optional(v.id("families")),
+    // Operator-managed feature flag. Missing and false both mean disabled.
+    autoTranslateEnabled: v.optional(v.boolean()),
   })
     .index("userId", ["userId"]),
+
+  /**
+   * On-demand task translation cache. Authored task fields remain the source
+   * of truth; these rows are disposable operational state keyed by locale.
+   */
+  contentTranslations: defineTable(
+    v.union(
+      v.object({
+        familyId: v.id("families"),
+        entityType: v.literal("task"),
+        entityId: v.id("tasks"),
+        field: v.union(v.literal("title"), v.literal("note")),
+        targetLocale: v.string(),
+        sourceHash: v.string(),
+        generation: v.number(),
+        status: v.literal("pending"),
+        leaseExpiresAt: v.number(),
+        updatedAt: v.number(),
+      }),
+      v.object({
+        familyId: v.id("families"),
+        entityType: v.literal("task"),
+        entityId: v.id("tasks"),
+        field: v.union(v.literal("title"), v.literal("note")),
+        targetLocale: v.string(),
+        sourceHash: v.string(),
+        generation: v.number(),
+        status: v.literal("ready"),
+        detectedSourceLocale: v.string(),
+        normalizedSource: v.string(),
+        translatedText: v.string(),
+        provider: v.string(),
+        model: v.string(),
+        updatedAt: v.number(),
+      }),
+      v.object({
+        familyId: v.id("families"),
+        entityType: v.literal("task"),
+        entityId: v.id("tasks"),
+        field: v.union(v.literal("title"), v.literal("note")),
+        targetLocale: v.string(),
+        sourceHash: v.string(),
+        generation: v.number(),
+        status: v.literal("source_is_target"),
+        detectedSourceLocale: v.string(),
+        provider: v.string(),
+        model: v.string(),
+        updatedAt: v.number(),
+      }),
+      v.object({
+        familyId: v.id("families"),
+        entityType: v.literal("task"),
+        entityId: v.id("tasks"),
+        field: v.union(v.literal("title"), v.literal("note")),
+        targetLocale: v.string(),
+        sourceHash: v.string(),
+        generation: v.number(),
+        status: v.literal("failed"),
+        errorCode: v.string(),
+        retryAfter: v.number(),
+        updatedAt: v.number(),
+      }),
+    ),
+  )
+    .index(
+      "by_entity_field_locale",
+      ["familyId", "entityType", "entityId", "field", "targetLocale"],
+    )
+    .index(
+      "by_locale_status",
+      ["familyId", "targetLocale", "status"],
+    ),
 
   /**
    * secrets — app-level configuration (e.g. integration API keys).

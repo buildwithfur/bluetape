@@ -1,860 +1,503 @@
-# Lazy Normalized Content Translation Implementation Plan
+# On-Demand Normalized Text Translation Implementation Plan
 
-> **For Hermes:** Use the `subagent-driven-development` skill to implement this plan task-by-task.
+**Goal:** Translate user-typed household content into the viewer's selected language while preserving the authored text, handling informal English/Singlish correctly, and doing no translation work until that locale is actually needed.
 
-**Goal:** Show employer- and helper-authored household content in the viewer's selected language by normalizing informal source text, translating only fields the viewer actually fetches, caching the result, and letting Convex live queries replace the source fallback automatically.
+**Core decision:** Use one opt-in read-through translation cache. Saving content stores only the authored source. When the signed-in viewer's database-controlled flag is enabled, a visible route shows the source immediately, reads any cached result for the viewer's locale, and requests one missing result in the background. There is no save-triggered translation, blanket backfill, locale fan-out, or separate voice pipeline.
 
-**Architecture:** Keep every authored field as the permanent source of truth. A visible route asks a reactive Convex query for translations of only the fields it is rendering; a client hook then calls an idempotent mutation for missing or stale results. The mutation records pending work and schedules an internal action, the action protects structured syntax, normalizes and translates through the selected hosted provider, and an internal mutation writes the result only if the source hash still matches. That write invalidates the subscribed query and updates the UI without polling or refresh.
-
-**Tech stack:** React 19, TypeScript, `react-i18next`, Convex queries/mutations/internal actions/scheduler, native `fetch`, SHA-256 source fingerprints, Vitest + `convex-test`, and a provider selected by a real English/Singlish-to-Burmese quality evaluation.
+**First release scope:** Prove English/Singlish task text to Burmese on Today and task detail. Do not expand to other entities or languages until the Burmese helper accepts the result.
 
 ---
 
-## Why this feature matters
+## 1. Product behavior
 
-Bluetape's helper-facing UI is localized, but household content remains whatever language the author typed. The practical household currently has one Burmese helper, so translating every record into every supported UI locale would waste API quota, database storage, and background work.
+### Typed text only
 
-The source text may also be shorthand or locally phrased rather than a complete instruction. Literal translation is not enough. For example:
+This feature starts from text entered into existing Bluetape forms. Voice capture and speech transcription are separate future features.
 
-```text
-Later take yellow cloth wipe table can
-```
-
-should first become a clear source sentence such as:
+Example source:
 
 ```text
-Later, use the yellow cloth to wipe the table.
+this one ah, the clothes in washer, you dont forget to hang later
 ```
 
-and only then be translated. Normalization must improve clarity without inventing actions or changing names, quantities, dates, negation, urgency, order, Markdown, or Bluetape's canonical `[[page:<id>|label]]` references.
+The provider interprets it as:
 
-The existing top-level plan (`docs/plans/PLAN.md` §6.10) says V2 translation will populate fields on save and describes `localContent`/embedded translation maps as the future design. This feature plan supersedes that direction: translation is lazy, field-level, viewer-locale-specific, and stored separately from source entities.
+```text
+Don't forget to hang the clothes in the washing machine later.
+```
 
----
+It then translates that intended meaning into natural Burmese in the same provider call.
 
-## Resolved product decisions
+### Source text remains authoritative
 
-### 1. Translate only for a viewer who needs it
+- Save exactly what the author typed on the task, routine, page, or shopping row.
+- Never replace the authored field with normalized or translated output.
+- Editors always edit the authored field.
+- A generated result is a disposable cache derived from the source.
+- Detail views may offer a quiet localized “Show original” action.
 
-The current family uses English and Burmese. Bluetape must not generate Indonesian user-content translations merely because Indonesian UI strings exist.
+### One on-demand rule
+
+When auto-translation is enabled for the viewer, each visible field follows one rule:
+
+1. Show the authored source immediately.
+2. Look for a current cached result for the viewer's profile locale.
+3. If one exists for the current source hash, use it.
+4. If none exists, include it in one bounded background generation batch.
+5. When the result is stored, Convex reactivity updates the mounted view.
+
+Do not translate on save. Do not pre-translate for every family member. Do not backfill when a member joins or changes language.
+
+### Database-controlled feature gate
+
+Add `autoTranslateEnabled` to `userProfiles` as an optional boolean. Treat absence and `false` identically; new profiles explicitly write `false`.
+
+The Language page displays a localized “Auto-translate content” switch beneath language selection, but the switch is read-only and visually disabled. A localized hint explains that the feature is managed by the database administrator.
 
 Rules:
 
-- If the viewer's locale matches the source locale, show the source and do no work.
-- If a Burmese viewer fetches an English field and no current Burmese result exists, enqueue Burmese generation.
-- If an English viewer fetches a Burmese field and no current English result exists, enqueue English generation.
-- A locale that no family member is currently viewing receives no translations.
-- If a member later selects another locale, translations are generated only as that member fetches content.
+- Users, family owners, and family admins cannot change this value through the application.
+- Do not add it to `userProfiles:update` or any other public mutation arguments.
+- It may be changed only by the operator directly in the Convex database/dashboard.
+- Client code checks `profile.autoTranslateEnabled === true`; absence never enables the feature.
+- Convex translation queries and mutations independently enforce the same check.
+- When disabled, show exact authored source even if cached translations already exist.
+- When disabled, do not claim jobs or call the provider.
+- Disabling the flag keeps cached rows but stops displaying or generating translations immediately.
+- Re-enabling the flag reuses any current cached result and resumes on-demand generation.
 
-### 2. Translation is lazy, not save-triggered
+### Language changes and new helpers
 
-Creating or editing content stores only the source. It does not fan out translation work.
+The target locale is always derived from the signed-in viewer's current profile.
 
-Translation is requested by mounted, visible routes:
+- If a user changes from Burmese to Filipino, visible content begins requesting Filipino results as it is opened.
+- Existing Burmese results stay cached and are reused if the user switches back.
+- A newly added Filipino helper sees source fallbacks first; only content they view is translated into Filipino.
+- Every new helper starts with auto-translation disabled until the operator enables their profile directly in the database.
+- New locale rows coexist because cache identity includes `targetLocale`.
+- Adding a locale requires separate UI-string localization and provider quality acceptance; content translation alone does not localize navigation or controls.
 
-- Today requests the visible task/routine/rule fields.
-- Shopping requests active row names.
-- A detail route requests the fields shown on that record.
-- Expanding Upcoming requests the newly visible task fields.
-- Search requests searchable titles/names, not every page body.
+This behavior is the reason to keep the system purely on demand. It handles language changes without eager fan-out or a migration workflow.
 
-AppShell warm subscriptions must not enqueue translation work. A data query may remain warm, but only the visible route mounts the translation-enforcement hook.
+### Unknown source language is acceptable
 
-### 3. Original text is permanent
+Do not add an input-language selector and do not infer source language from the author's UI locale. The provider detects the source language during the first requested generation.
 
-Machine output never replaces the authored field.
+If the detected source language already matches the target locale:
 
-For each translated field retain:
+- store a current `source_is_target` result
+- continue displaying the exact authored source
+- do not display the normalized text
+- reuse that result so the same source/locale pair is not analyzed again
 
-- original source text on the source entity
-- normalized source text in translation storage
-- translated text in translation storage
-- detected source language
-- source fingerprint
-- provider/model metadata
-
-Editors always edit the original source. Lists show the viewer's language. Detail views offer a quiet “Show original” action when a current translation exists.
-
-### 4. Normalization is mandatory for the production path
-
-The production provider must turn informal phrasing into a clear, complete household instruction before or as part of translation.
-
-Normalization must:
-
-- preserve the exact requested action
-- preserve negation (`do not`, `don't`)
-- preserve names and linked household items
-- preserve quantities, dates, units, sequence, and urgency
-- improve grammar and sentence completeness
-- avoid adding assumptions when the source is ambiguous
-- leave protected tokens byte-for-byte unchanged
-
-### 5. Browser inference is not the V1 path
-
-Chrome's built-in Translator, Prompt, and Rewriter APIs currently do not work on Android. Chrome's built-in Translator list also does not include Burmese.
-
-Transformers.js can technically run translation models such as NLLB-200 in a browser, but the available multilingual model is large, device-dependent, translation-only rather than a reliable instruction normalizer, and its model card describes it as research-oriented rather than intended for production deployment. Requiring the helper's phone to download and run both a translator and a normalizer would make reliability depend on device RAM, WebGPU support, battery, and model cache state.
-
-Use a hosted backend provider for V1. Keep the provider boundary replaceable so an on-device path can be evaluated later without changing the Convex workflow or storage contract.
-
-### 6. Provider selection is decided by a quality gate
-
-Do not select a provider from marketing claims alone. Evaluate real household phrasing in these lanes:
-
-1. DeepL Translate directly (free baseline).
-2. DeepL Write followed by DeepL Translate (paid, English normalization only).
-3. One hosted multilingual LLM returning normalized source plus target translation.
-4. If needed, hosted LLM normalization followed by DeepL translation.
-
-Current provider facts:
-
-- DeepL API Free allows up to 500,000 translated characters per month and uses `https://api-free.deepl.com`.
-- DeepL Translate can produce fluent target text but does not guarantee source normalization.
-- DeepL custom translation instructions do not currently support Burmese as a target.
-- DeepL Write can correct/rephrase English for clarity, but requires API Pro, is a separate request, and does not support Burmese or Indonesian as Write languages.
-- The likely production winner is a hosted multilingual LLM in one structured call, but Burmese quality must be reviewed by the actual helper before this becomes a resolved provider decision.
-
-Only implement the winning production adapter after the evaluation. Do not ship several dormant providers or expose provider selection in Settings.
+This may spend one call on a same-language cache miss. That is a deliberate simplicity trade-off.
 
 ---
 
-## User experience
+## 2. Transformation contract
 
-### Source fallback
+### One structured text-model call
 
-A missing translation never blocks rendering. Show the original immediately.
+For a translated field, the selected hosted multilingual model returns:
 
-Do not show row-level spinners across the daily checklist. On detail views, a small localized “Translating…” status may be shown only if testing proves the live text swap is confusing without it.
+```ts
+{
+  detectedSourceLocale: string,
+  normalizedSource: string,
+  translatedText: string,
+  sourceIsTarget: boolean,
+}
+```
 
-### Live replacement
+The model must normalize and translate together. Do not create an independent rewrite call followed by a translation call.
 
-When translation storage changes, the subscribed Convex query reruns and the localized selector returns the translated text. React updates the existing content in place. No polling, manual refresh, or navigation is required.
+The normalized source is stored for evaluation and diagnostics, but it is not a second editable field and is not shown in normal UI.
 
-### Original access
+### Field-specific modes
 
-- Lists: selected language only, with source fallback.
-- Detail pages: selected language by default; show “Show original” only when a current translation differs from source.
-- Editors: source text only.
-- Search: match both original and translations that already exist.
+Not every field is an instruction. The server-side source registry assigns one mode to every supported entity/field pair:
 
-### Search-specific behavior
+| Mode | Initial fields | Behavior |
+|---|---|---|
+| `instruction` | task title/note; later routine title/description and rule instructions | Resolve informal grammar and fillers while preserving the intended action. |
+| `label` | later page title/location and shopping name | Translate concisely; never expand a noun phrase into an instruction. |
+| `prose` | later item/rule body content | Preserve paragraph meaning and structure without inventing advice. |
 
-Search is a special case because a Burmese query cannot match an English title that has never been translated.
+The initial POC registers only task `title` and `note` as `instruction` fields.
 
-When Search opens for a Burmese viewer:
+### Meaning-preservation requirements
 
-- request title/name translations for the bounded searchable catalog currently fetched by Search
-- do not request notes or page bodies
-- let the live translation query expand Burmese matches as title translations arrive
-- keep the original-title search path available during generation
+For instruction fields, preserve:
 
-This translates searchable labels only when Search is actually used and avoids translating full content catalogs.
+- every action and object
+- negation
+- names and stable wiki targets
+- quantities, numeric values, dates, sequence, and urgency
+- URLs and code
+- the distinction between an instruction and a suggestion
+
+Do not add missing actions or make an instruction stricter or weaker.
+
+Numbers must preserve their semantic value. Canonical wiki IDs, URLs, and code must remain byte-for-byte identical. Human-readable unit words may be translated when their value is preserved.
+
+### Provider selection
+
+The initial adapter uses OpenRouter with `deepseek/deepseek-v4-flash` as its
+default model. `OPENROUTER_TRANSLATION_MODEL` may override the model at the
+deployment level without adding provider-selection UI or changing client code.
+The server credential is `OPENROUTER_API_KEY`.
+
+Evaluate at most two credible hosted multilingual models using a small redacted corpus of real-style household phrases. The corpus must include Singlish, incomplete grammar, negation, quantities, wiki links, and Burmese-authored text for English output.
+
+Choose one provider only after:
+
+- automated checks confirm required facts survive
+- provider names are blinded
+- the Burmese helper approves clarity, naturalness, and operational correctness
+
+Do not build multiple dormant provider adapters or a provider-selection screen. If no candidate is reliable, stop the feature rather than adding prompt complexity indefinitely.
 
 ---
 
-## Data model
+## 3. Data model
 
-Add a separate `contentTranslations` table rather than embedding all locales on every source record.
+Add a separate `contentTranslations` table. It contains operational cache state, not authored content.
 
-Each document represents one entity field in one target locale:
+Extend `userProfiles` with:
+
+```ts
+autoTranslateEnabled?: boolean // absent/false means disabled
+```
+
+Profile creation writes `false`. No public profile validator or mutation accepts this field.
+
+Logical identity:
+
+```text
+familyId + entityType + entityId + field + targetLocale
+```
+
+Common fields:
 
 ```ts
 {
   familyId: Id<"families">,
-  entityType: "task" | "routine" | "page" | "groceryItem",
-  entityId: Id<"tasks"> | Id<"routines"> | Id<"pages"> | Id<"groceryItems">,
-  field: "title" | "note" | "description" | "content" | "location" | "name",
+  entityType: "task", // add other types only after the task POC
+  entityId: Id<"tasks">,
+  field: "title" | "note",
   targetLocale: string,
   sourceHash: string,
-  status: "pending" | "ready" | "failed",
-  normalizedText?: string,
-  translatedText?: string,
-  detectedSourceLocale?: string,
-  provider?: string,
-  model?: string,
-  attempts: number,
-  retryAfter?: number,
-  errorCode?: string,
+  generation: number,
   updatedAt: number,
 }
 ```
 
-Use a discriminated-union schema validator so a `ready` document requires normalized and translated text while `pending` and `failed` documents cannot masquerade as usable results.
+Use a discriminated-union schema for states:
+
+- `pending`: includes `leaseExpiresAt`
+- `ready`: includes detected locale, normalized source, translated text, provider, and model
+- `source_is_target`: includes detected locale, provider, and model; no generated text is displayed
+- `failed`: includes a stable error code and `retryAfter`
 
 Indexes:
 
 ```ts
 .index(
-  "by_familyId_and_entityType_and_entityId_and_field_and_targetLocale",
+  "by_entity_field_locale",
   ["familyId", "entityType", "entityId", "field", "targetLocale"],
 )
 .index(
-  "by_familyId_and_targetLocale_and_status",
+  "by_locale_status",
   ["familyId", "targetLocale", "status"],
 )
 ```
 
-The first index is the deduplication/current-result lookup. The second supports bounded diagnostics and retry inspection.
+Use SHA-256 of the exact canonical source field as `sourceHash`. Editing source text makes the old cache entry unusable without requiring translation work inside the source mutation.
 
-Do not add translation arrays to source documents. Translation status is higher-churn operational data and belongs in its own table.
-
-### Source freshness
-
-Use SHA-256 of the exact canonical source field as `sourceHash`.
-
-Benefits:
-
-- no migration or version field on every existing entity
-- changing one field invalidates only that field's translation
-- completion/status/count changes do not invalidate text
-- a delayed action can compare its original hash with the current field and discard stale output
-
-Extract a shared Convex SHA-256 helper instead of creating a third copy beside the existing API-key hash implementations.
-
-### Translatable field registry
-
-Create one server-side registry that maps valid entity/field pairs and reads the authoritative source:
-
-| Entity | Fields |
-|---|---|
-| Task | `title`, `note` |
-| Routine | `title`, `description` |
-| Page | `title`, `content`, `location` |
-| Grocery item | `name` |
-
-`pages.localName` is not translated because it may be the exact name printed on a product. Preserve `pages.localContent` as legacy stored data, but do not treat it as generated output or silently infer which locale it represents.
-
-Names of people, family names, dates, counts, and photos are not translatable entities.
+When a supported source entity is hard-deleted, delete its translation rows in the same source mutation using the entity-prefix index and an explicit maximum `.take(...)`. Tasks, shopping rows, and rules must not leave orphaned cache entries.
 
 ---
 
-## Convex request lifecycle
+## 4. Minimal Convex lifecycle
 
-### 1. Visible route describes the fields it renders
+### Reactive read
 
-The route passes bounded field references to a reusable hook:
+`translations:getForFields` is a pure authenticated query.
 
-```ts
-useLocalizedFields([
-  { entityType: "task", entityId: task._id, field: "title" },
-  { entityType: "task", entityId: task._id, field: "note" },
-])
-```
+It:
 
-The hook derives the target locale from the current profile. It does not accept an arbitrary target locale from feature code.
+- derives the viewer locale and current family server-side
+- returns a disabled result without reading translation rows unless `autoTranslateEnabled === true`
+- rejects a profile locale that is not on the server content-locale allowlist
+- accepts a bounded discriminated list of entity/field references
+- verifies every source entity belongs to that family
+- reads and hashes each current source field
+- returns only current cache states for the viewer locale
+- has no side effects
 
-### 2. Reactive query returns current results
+One mounted route sends one bounded batch, not one query per row.
 
-`translations:getForFields`:
+### Idempotent claim
 
-- requires an authenticated family member
-- accepts a bounded list of field references
-- loads each source entity and verifies family ownership
-- computes the current source hash
-- returns a ready translation only when locale and source hash match
-- reports missing, pending, or failed state without side effects
+`translations:ensure` is a public mutation accepting only bounded field references. It does not accept `familyId`, `userId`, or `targetLocale` from the client.
 
-Convex queries remain deterministic and never call the provider or write state.
+For each field it:
 
-### 3. Client hook requests missing work
+- derives identity, active family, and target locale server-side
+- returns without writes unless the caller's `autoTranslateEnabled === true`
+- rejects a target locale that is not on the server content-locale allowlist
+- validates the entity/field pair through the source registry
+- recomputes the current source hash
+- skips a current `ready` or `source_is_target` result
+- skips a current pending result whose lease has not expired
+- skips a failed result until `retryAfter`
+- otherwise increments `generation` and writes `pending`
 
-A `useEffect` inside `useLocalizedFields` calls one `translations:ensure` mutation for missing/stale fields only when the route enables generation.
+After all references are processed, the mutation schedules one internal batch action containing only newly claimed fields.
 
-The effect key is based on stable entity IDs, fields, target locale, and current source hashes. Rerenders may call the mutation again, but correctness does not depend on client-side suppression.
+The mutation transaction is the deduplication boundary. Client memoization reduces noise but is not relied on for correctness.
 
-### 4. Mutation authorizes and deduplicates
+### Provider action
 
-`translations:ensure`:
+One internal action receives a bounded list of claimed row IDs, source hashes, and generations.
 
-- requires the caller's profile locale to equal the requested target locale
-- verifies every entity belongs to the caller's active family
-- enforces a bounded batch size
-- recomputes source hashes server-side
-- skips ready results for the same hash
-- skips already-pending results for the same hash
-- respects `retryAfter` for failed results
-- inserts or updates `pending` rows transactionally
-- schedules one internal batch action for newly claimed fields
+It:
 
-The unique logical key is family + entity type + entity ID + field + target locale. Concurrent clients converge on one pending row because the check and write happen in a Convex mutation transaction.
+1. Loads the current claimed sources through one internal query.
+2. Drops any claim whose source hash, generation, or pending state no longer matches.
+3. Protects structured syntax for each remaining field.
+4. Calls the selected provider once with a bounded structured batch and timeout.
+5. Validates every returned result and its protected material independently.
+6. Writes through one internal mutation.
 
-### 5. Internal action normalizes and translates
+Use native `fetch` unless the chosen provider genuinely requires an SDK.
 
-The action:
+### Freshness-safe completion
 
-1. Reads all claimed source fields in one internal query.
-2. Drops any field whose source hash no longer matches the claim.
-3. Protects structured tokens.
-4. Batches compatible fields for the selected provider within provider payload limits.
-5. Requests structured output containing detected source language, normalized source, and translated text.
-6. Validates provider output and protected-token integrity.
-7. Writes results through one internal mutation.
+The completion mutation rechecks:
 
-Use native `fetch`; do not add a provider SDK unless the selected provider cannot be called credibly through REST.
+- the translation row is still pending
+- `generation` matches the action claim
+- the entity still exists in the same family
+- the source hash still matches
 
-### 6. Internal mutation writes only fresh results
+Only then may it write `ready`, `source_is_target`, or `failed`. An older action can never overwrite a newer claim.
 
-Before writing `ready`, re-read each source field and recompute its hash. If it differs from the action's claim, discard the result. The viewer's still-mounted query will observe the new source hash and enqueue the newer text.
+### Simple failure behavior
 
-### 7. Convex updates the UI
+Do not build a retry scheduler for the first release.
 
-Writing a ready translation invalidates `translations:getForFields`. The client receives the new value, `useLocalizedFields` selects `translatedText`, and the visible route updates automatically.
+- Provider failure records `failed` with a short `retryAfter`.
+- Source text remains visible and normal app behavior continues.
+- A later route mount may reclaim the failed row after the cooldown.
+- An expired pending lease may also be reclaimed.
+- Keep source text, provider bodies, credentials, and stack traces out of application logs.
 
----
-
-## Normalization and syntax protection
-
-### Protected material
-
-Before model/provider calls, protect:
-
-- canonical wiki targets such as `page:<id>`
-- unresolved wiki targets, while allowing their visible label to be translated
-- Markdown link URLs
-- bare URLs
-- inline code and fenced code blocks
-- numbers, quantities, dates, and explicit units where a change would alter instructions
-
-For canonical wiki links:
-
-```text
-[[page:abc123|yellow cloth]]
-```
-
-represent the target separately from the translatable label:
-
-```xml
-<wiki target="page:abc123">yellow cloth</wiki>
-```
-
-A DeepL adapter can use XML tag handling. An LLM adapter can use opaque placeholders plus a structured response schema. The provider-neutral protection layer must restore the same canonical target regardless of adapter.
-
-### Integrity checks
-
-Reject output if:
-
-- a protected token is missing, duplicated, or altered
-- a wiki target changes
-- a protected number/date/unit changes
-- output fields are missing
-- the target-language text is empty
-- structured output cannot be parsed
-
-Rejected output becomes a retryable failure; the UI keeps showing source text.
-
-### Normalization instruction contract
-
-The selected provider receives a concise instruction equivalent to:
-
-> Rewrite the source as a clear, complete household instruction in the same source language. Preserve every action, object, name, quantity, date, unit, negation, urgency, and sequence. Do not infer missing actions or add advice. Keep every protected token unchanged. Then translate the normalized instruction into the requested target language using natural wording suitable for a household helper.
-
-Do not store model reasoning. Store only detected source language, normalized source, translated text, and provider metadata.
+This deliberately avoids a background retry subsystem before real usage proves one is needed.
 
 ---
 
-## Failure, retry, and quota behavior
+## 5. Syntax handling
 
-Actions are not automatically retried safely by Convex, so retries are explicit and bounded.
+### Task POC
 
-- Retry transient provider errors (`429`, `500`, `503`, `504`, network timeout) with scheduled backoff.
-- Do not retry malformed requests, unsupported language pairs, or failed integrity checks indefinitely.
-- Store a stable `errorCode`, not source text, secrets, raw provider responses, or stack traces.
-- After the retry limit, keep `failed`; a later visible fetch may reclaim it after `retryAfter`.
-- DeepL quota exhaustion (`456`) falls back to source and should surface in backend diagnostics.
-- Saving, completing, or viewing household work must never fail because translation failed.
+For task title and note, protect:
 
-Add a bounded owner/admin diagnostic query for failed translation rows and provider usage metadata. Do not add a translation-provider control panel to Settings; Settings remains language-only.
+- canonical `[[page:<id>|label]]` targets
+- unresolved wiki targets
+- Markdown link URLs and bare URLs
+- inline and fenced code
+- numeric values and explicit dates
 
----
+Wiki labels may be translated, but stable targets must not change.
 
-## Security and privacy
+Reject a provider result when a protected token is missing, duplicated, or altered. Rejection becomes `failed`; it never replaces the source fallback.
 
-- Provider credentials live in typed Convex environment variables declared in `convex/convex.config.ts`.
-- Never expose provider keys in Vite environment variables or browser code.
-- `translations:ensure` derives identity, active family, and viewer locale server-side.
-- A client cannot translate another family's records or request arbitrary target locales for quota abuse.
-- Send only required text fields to the provider; never send photos, family/member records, auth data, or unrelated page content as context.
-- Provider logs must not contain household source text.
-- DeepL's explicit no-persistent-storage/no-training statement applies to paid API plans. If API Free is chosen, document that privacy trade-off before production use.
+### Page bodies are deferred
+
+Do not translate arbitrary Markdown page bodies in the first slice. Before page translation is added, implement structural segmentation that sends translatable text nodes with stable segment IDs and reconstructs the original Markdown/wiki structure afterward.
+
+Do not rely on a prompt alone to preserve headings, lists, emphasis, or custom wiki syntax.
 
 ---
 
-## Success criteria
+## 6. Client behavior
 
-- An English/Singlish task fetched by the Burmese helper first shows the source, then updates live to clear Burmese without refresh.
-- No translation job is created until a visible route requests the field.
-- AppShell warm subscriptions do not create translation jobs.
-- Indonesian content translations are not generated unless an Indonesian viewer requests them.
-- Informal source text is stored unchanged while normalized source and translation are cached separately.
-- A Burmese-authored field can be normalized and translated to English when the employer fetches it.
-- Canonical wiki page IDs remain byte-for-byte unchanged through normalization and translation.
-- URLs, code, quantities, dates, negation, and order survive the pipeline.
-- Concurrent devices requesting the same field produce one logical pending translation.
-- Editing the source while an action is running prevents the stale result from becoming current.
-- Provider failure or quota exhaustion never blocks source rendering or ordinary mutations.
-- Switching Language uses cached current results immediately and lazily requests only newly needed fields.
-- Search requests title/name translations only and can match both source and ready translated labels.
-- The actual Burmese helper approves the selected provider on a blind sample of real household phrases.
-- After acceptance, the application version is bumped from `0.0.0` to `0.1.0`.
+Create one reusable `useLocalizedFields` hook for visible routes.
+
+The hook:
+
+- derives the current profile locale
+- returns authored source and skips translation queries/effects unless `profile.autoTranslateEnabled === true`
+- subscribes to `translations:getForFields`
+- selects translated text only from a current `ready` row
+- returns the exact source for missing, pending, failed, and `source_is_target`
+- calls `translations:ensure` once logically for claimable fields
+- supports a detail-view “Show original” override
+
+Do not show spinners on Today rows. A small localized “Translating…” message on task detail is optional and should be added only if the live replacement is confusing in real testing.
+
+AppShell warm data subscriptions do not mount this hook and therefore cannot create translation jobs.
+
+The Language page renders the disabled/read-only switch from the live profile value. Direct database changes update the switch and translation behavior reactively; there is no client toggle handler.
+
+---
+
+## 7. Implementation phases
+
+### Phase 0 — Quality gate
+
+**Objective:** Decide whether normalized English/Singlish-to-Burmese translation is good enough to ship.
+
+- Create a small redacted evaluation corpus with expected preserved facts.
+- Evaluate no more than two hosted multilingual models.
+- Use the same field-mode prompt and output schema intended for production.
+- Blind outputs for helper review.
+- Record one selected model, known weaknesses, privacy/retention posture, and approximate observed cost.
+- Stop if the helper does not approve the output.
+
+Deliverables:
+
+- `docs/translation-evaluation.md`
+- `scripts/evaluate-translations.mjs`
+- `scripts/fixtures/translation-corpus.json`
+- ignored local result files
+
+### Phase 1 — Task backend POC
+
+**Objective:** Implement the smallest reliable cache lifecycle for task title and note.
+
+- Install and configure `vitest`, `convex-test`, and `@edge-runtime/vm` through npm if not already present.
+- Add the discriminated translation table and indexes.
+- Add optional `userProfiles.autoTranslateEnabled`, default it to false on profile creation, and keep it out of public update arguments.
+- Add the task-only source registry with `instruction` mode.
+- Add SHA-256 source hashing using the existing shared implementation.
+- Add task syntax protection and restoration tests.
+- Add the selected provider adapter with mocked network tests.
+- Implement the bounded get, ensure, action, and completion functions.
+- Add lease, generation, stale-source, cross-family, and arbitrary-locale tests.
+- Add tests proving disabled profiles cannot read cached translations or create translation jobs, including direct public-function calls.
+- Delete task translation rows when a task is hard-deleted.
+
+Do not add routines, pages, shopping, Search, automatic retries, or diagnostics UI in this phase.
+
+### Phase 2 — Task UI POC
+
+**Objective:** Prove one real typed instruction from save to Burmese display.
+
+- Add `useLocalizedFields` and a pure localized-text selector.
+- Add the read-only disabled auto-translate switch and localized administrator-managed hint to the Language page.
+- Request only visible task title/note fields on Today and task detail.
+- Keep editing bound exclusively to authored task fields.
+- Add localized “Show original” on detail.
+- Verify completion toggles do not invalidate translation.
+- Test source-first rendering, live replacement, failure fallback, stale edit rejection, and stable wiki navigation.
+- Have the Burmese helper test the POC on the actual Android phone.
+
+Do not continue until the helper accepts this slice.
+
+### Phase 3 — Controlled expansion
+
+**Objective:** Extend the proven mechanism without changing its lifecycle.
+
+Expand one entity group at a time:
+
+1. Routines using `instruction` mode.
+2. Shopping names using `label` mode.
+3. Rule and item titles/locations using `label` mode.
+4. Rule and item bodies using structural Markdown segmentation plus the appropriate `instruction` or `prose` mode.
+
+For every group:
+
+- add registry entries and validators
+- add source-hash and syntax tests
+- add bounded route field batches
+- preserve source-only editors
+- add deletion cleanup where deletion is allowed
+- verify with real content before expanding again
+
+### Phase 4 — Operational closure
+
+**Objective:** Document and release only what proved necessary.
+
+- Add a bounded owner/admin query for failed cache metadata if failures need operational inspection.
+- Update `docs/plans/PLAN.md` statements that still describe manual or save-triggered translation.
+- Record the accepted architecture and provider decision in an ADR.
+- Verify provider credentials use typed Convex environment variables and never reach browser code.
+- Verify there is no public function capable of changing `autoTranslateEnabled`.
+- Run the full test, i18n, lint, build, Convex sync, and diff checks.
+- Change the application version only as part of an explicitly requested release.
+
+---
+
+## 8. Search and locale rollout
+
+Multilingual Search is not part of the first translation release.
+
+- Existing Search continues matching authored source fields.
+- Do not translate an entire catalog merely because Search opens.
+- Ready cached labels may be incorporated later, but Burmese queries will not be promised until a bounded multilingual Search design is approved.
+
+Before enabling a new content locale such as Filipino:
+
+1. Add and review the UI locale file separately.
+2. Add that locale to the server allowlist.
+3. Run a small language-specific content evaluation with a fluent reviewer.
+4. Enable it only after acceptance.
+
+Changing a profile to an allowed locale requires no data migration or backfill.
+
+---
+
+## 9. Security, privacy, and limits
+
+- Provider credentials live only in typed Convex environment variables.
+- Public functions derive identity, active family, and target locale server-side.
+- Translation reads and writes require the authenticated profile flag to equal `true`; client gating is only a UX optimization.
+- Clients cannot request arbitrary families, users, locales, entity types, or fields.
+- Every list and batch is explicitly bounded.
+- Send only the requested text fields and transformation mode to the provider.
+- Never send photos, member records, auth data, or unrelated page content.
+- Store stable error codes, not provider response bodies.
+- Document the selected provider's retention and training terms before production use.
+
+---
+
+## 10. Acceptance criteria
+
+- Informal typed English/Singlish is translated into helper-approved Burmese without losing actions, objects, negation, quantities, dates, order, or urgency.
+- Every existing and newly created profile has auto-translation effectively disabled by default.
+- The Language page shows the current state but provides no working toggle action.
+- Only a direct database edit can enable or disable the profile flag.
+- A disabled profile always sees exact source, cannot read cached translation output, and cannot trigger provider work.
+- Saving content never waits for translation.
+- No provider call occurs until a visible route needs a missing locale result.
+- The source renders immediately during missing, pending, or failed states.
+- One source hash and target locale produce one logical generation claim.
+- A crashed action cannot leave a permanently unclaimable pending row.
+- An older action cannot overwrite a newer generation or edited source.
+- Same-language detection is cached without replacing the exact source.
+- Canonical wiki targets, URLs, code, and numeric values survive translation.
+- Changing locale or adding a helper causes no eager backfill; visible content translates on demand.
+- Existing locale caches remain reusable after switching away and back.
+- Provider failure never blocks saving, viewing, completing, or deleting household work.
+- The Burmese helper approves the task POC before any entity expansion.
 
 ---
 
 ## Non-goals
 
-- Translating all existing content in a blanket backfill.
-- Translating into every locale supported by the UI.
-- Running a required model in the helper's Android browser.
-- Replacing authored source text with normalized or translated text.
-- Manual editing of generated translations in the first iteration.
-- A provider-selection UI or translation controls in Settings.
-- Translating people/family names, photos, counts, or exact product `localName` values.
-- Full multilingual semantic search before title-level lazy translation is proven.
-- Certified, legal, medical, or safety-critical translation guarantees.
-
----
-
-## POC-before-expansion rule
-
-Prove one real task end-to-end before changing routines, pages, shopping, or Search.
-
-POC scenario:
-
-1. Admin creates an informal English/Singlish task containing a canonical wiki link and a negation.
-2. No translation row exists after save.
-3. Burmese helper opens the task detail or Today.
-4. Source text renders immediately.
-5. The visible route requests the missing Burmese fields once logically.
-6. Backend stores `pending`, runs normalization/translation, and writes `ready`.
-7. Convex live query replaces the source fallback with Burmese.
-8. The wiki link opens the same stable page ID.
-9. Editing the source during a deliberately delayed action proves stale output is discarded.
-10. A provider failure proves source rendering and normal task behavior remain intact.
-
-Do not expand to other entities until this slice passes automated tests and human Burmese review.
-
----
-
-## Task 1: Build the translation quality corpus and select a provider
-
-**Objective:** Decide the production provider using real household language rather than assumptions.
-
-**Files:**
-
-- Create: `docs/translation-evaluation.md`
-- Create: `scripts/evaluate-translations.mjs`
-- Create: `scripts/fixtures/translation-corpus.json`
-- Modify: `.gitignore`
-
-**Steps:**
-
-1. Collect a small redacted corpus covering:
-   - informal English/Singlish fragments
-   - complete English instructions
-   - Burmese-authored instructions for English output
-   - negation, quantities, dates, sequence, and urgency
-   - wiki links, URLs, and Markdown
-2. Record expected preserved facts for every example, not one “correct” prose output.
-3. Implement a script that reads credentials from environment variables, protects tokens, and writes provider outputs to an ignored local results file.
-4. Add that local results path to `.gitignore`; never commit raw household examples or provider credentials.
-5. Evaluate direct DeepL Translate, DeepL Write → Translate if Pro credentials are available, and one hosted multilingual LLM with structured output.
-6. Blind the provider names and have the Burmese helper assess clarity, naturalness, and operational correctness.
-7. Record the selected provider, model/version, known weaknesses, and rejection rationale for alternatives in `docs/translation-evaluation.md`.
-8. Stop if no candidate preserves meaning reliably. Do not compensate with prompt complexity before reviewing bad examples.
-
-**Verification:** The evaluation document names one production adapter and includes helper-reviewed examples without storing private household text in Git.
-
-**Suggested commit:**
-
-```bash
-git add .gitignore docs/translation-evaluation.md scripts/evaluate-translations.mjs scripts/fixtures/translation-corpus.json
-
-git commit -m "test: evaluate normalized Burmese translation providers"
-```
-
----
-
-## Task 2: Establish Convex translation test infrastructure
-
-**Objective:** Add repeatable backend tests before schema or workflow implementation.
-
-**Files:**
-
-- Modify via npm: `package.json`, `package-lock.json`
-- Create: `convex/test.setup.ts`
-- Create: `convex/translations.test.ts`
-
-**Steps:**
-
-1. Install current test dependencies through npm:
-
-   ```bash
-   npm install -D vitest convex-test @edge-runtime/vm
-   npm pkg set scripts.test="vitest run"
-   ```
-
-2. Configure `convex-test` with the repository schema and `import.meta.glob` module map.
-3. Add authenticated family fixtures for owner, admin, helper, English profile, and Burmese profile.
-4. Write a baseline test proving a helper cannot read another family's task.
-5. Run `npm test` and confirm the harness passes before feature code begins.
-
-**Suggested commit:**
-
-```bash
-git add package.json package-lock.json convex/test.setup.ts convex/translations.test.ts
-
-git commit -m "test: add Convex translation regression harness"
-```
-
----
-
-## Task 3: Implement and test source protection primitives
-
-**Objective:** Make normalization/translation safe for Bluetape syntax before calling any model.
-
-**Files:**
-
-- Create: `convex/translation/protection.ts`
-- Create: `convex/translation/protection.test.ts`
-- Create: `convex/lib/sha256.ts`
-- Modify: `convex/apiKeys.ts`
-- Modify: `convex/http.ts`
-
-**Steps:**
-
-1. Write failing tests for canonical wiki links, unresolved links, labeled links, multiple links, URLs, Markdown links, inline/fenced code, numbers, dates, quantities, and malformed provider output.
-2. Extract the existing SHA-256 implementation into `convex/lib/sha256.ts` and keep API-key behavior unchanged.
-3. Implement `protectTranslatableText` returning protected text plus a restoration manifest.
-4. Implement `restoreTranslatedText` with strict one-to-one token validation.
-5. Verify canonical wiki targets are identical after restoration while visible labels may change.
-6. Verify restoration rejects missing, duplicated, reordered where prohibited, or altered protected tokens.
-7. Run targeted tests and the full suite.
-
-**Suggested commit:**
-
-```bash
-git add convex/translation/protection.ts convex/translation/protection.test.ts convex/lib/sha256.ts convex/apiKeys.ts convex/http.ts
-
-git commit -m "feat: protect structured content during translation"
-```
-
----
-
-## Task 4: Add field-level translation storage
-
-**Objective:** Store lazy operational state separately from source entities.
-
-**Files:**
-
-- Modify: `convex/schema.ts`
-- Modify: `convex/admin.ts`
-- Create: `convex/translation/validators.ts`
-- Modify: `convex/translations.test.ts`
-
-**Steps:**
-
-1. Write failing schema tests for pending, ready, and failed documents.
-2. Add the `contentTranslations` discriminated-union table and indexes specified above.
-3. Add reusable validators for entity type, entity ID union, field, target locale, and bounded field-reference arrays.
-4. Add the table to dev-only wipe support without changing production wipe protections.
-5. Test the logical uniqueness lookup and family/field validation.
-6. Run `npm test` and `npx convex dev --once`.
-
-**Suggested commit:**
-
-```bash
-git add convex/schema.ts convex/admin.ts convex/translation/validators.ts convex/translations.test.ts
-
-git commit -m "feat: add lazy content translation storage"
-```
-
----
-
-## Task 5: Add the authoritative source-field registry
-
-**Objective:** Centralize valid entity/field pairs, authorization boundaries, and source hashing.
-
-**Files:**
-
-- Create: `convex/translation/sourceFields.ts`
-- Create: `convex/translation/sourceFields.test.ts`
-
-**Steps:**
-
-1. Write failing tests for every valid and invalid entity/field combination.
-2. Implement a typed discriminated reference validator.
-3. Implement one batched source reader that:
-   - resolves typed IDs
-   - verifies each entity exists in the active family
-   - reads only the requested source field
-   - treats absent optional fields as non-translatable
-   - computes SHA-256 over the exact canonical source
-4. Verify `localName`, `localContent`, status fields, counts, people, and photos cannot be requested.
-5. Bound the number of references accepted per call.
-6. Run targeted and full tests.
-
-**Suggested commit:**
-
-```bash
-git add convex/translation/sourceFields.ts convex/translation/sourceFields.test.ts
-
-git commit -m "feat: register translatable source fields"
-```
-
----
-
-## Task 6: Implement the selected provider adapter
-
-**Objective:** Convert protected source text into validated normalized source and target translation through one replaceable boundary.
-
-**Files:**
-
-- Create: `convex/translation/provider.ts`
-- Create: `convex/translation/provider.test.ts`
-- Modify: `convex/convex.config.ts`
-
-**Steps:**
-
-1. Define a narrow provider interface returning:
-   - detected source locale
-   - normalized source text
-   - translated target text
-   - provider/model identifiers
-2. Add typed environment variables only for the provider selected in Task 1.
-3. Implement the adapter with native `fetch`, explicit timeout, bounded payload size, and structured response validation.
-4. Keep provider credentials and source text out of logs and errors.
-5. Feed protected tokens through the provider and restore/validate both normalized and translated outputs.
-6. Unit-test success, timeout, rate limit, quota exhaustion, malformed output, unsupported locale, and token-integrity failure using mocked network responses.
-7. Run the provider against the redacted evaluation corpus in development.
-
-**Suggested commit:**
-
-```bash
-git add convex/translation/provider.ts convex/translation/provider.test.ts convex/convex.config.ts
-
-git commit -m "feat: add normalized translation provider adapter"
-```
-
----
-
-## Task 7: Build the reactive get/ensure/process workflow
-
-**Objective:** Implement pure reads, idempotent claiming, scheduled provider work, retries, and freshness-safe writes.
-
-**Files:**
-
-- Create: `convex/translations.ts`
-- Create: `convex/translationActions.ts`
-- Modify: `convex/translations.test.ts`
-
-**Steps:**
-
-1. Write failing tests for missing, pending, ready, stale, failed, unauthorized, cross-family, arbitrary-locale, and duplicate-concurrent requests.
-2. Implement `translations:getForFields` as a pure authenticated query returning current state for a bounded field list.
-3. Implement `translations:ensure` as a public mutation that derives family and locale from the caller, validates sources, deduplicates claims, and schedules only newly pending fields.
-4. Implement one internal query that loads a claimed batch and drops stale hashes.
-5. Implement one internal action that calls the provider for a bounded batch.
-6. Implement one internal mutation that revalidates all source hashes and writes ready/failed results transactionally.
-7. Implement explicit bounded retries for transient failures using `ctx.scheduler.runAfter`.
-8. Verify two clients claiming the same field result in one logical pending row and no duplicate current result.
-9. Verify an edit during a delayed action prevents stale output from being returned as current.
-10. Run `npm test` and `npx convex dev --once`.
-
-**Suggested commit:**
-
-```bash
-git add convex/translations.ts convex/translationActions.ts convex/translations.test.ts
-
-git commit -m "feat: add reactive lazy translation workflow"
-```
-
----
-
-## Task 8: Add the client localization hook
-
-**Objective:** Let visible routes subscribe to cached translations and enqueue missing work without making warm queries generate jobs.
-
-**Files:**
-
-- Create: `src/data/useLocalizedFields.ts`
-- Create: `src/lib/localized-content.ts`
-- Create: `src/lib/localized-content.test.ts`
-- Modify: `src/data/hooks.ts`
-
-**Steps:**
-
-1. Write failing selector tests for source locale, missing, pending, ready-current, ready-stale, failed, and “show original”.
-2. Implement `selectLocalizedText` as a pure source-fallback helper.
-3. Implement `useLocalizedFields` with stable memoized field references and the current profile locale.
-4. Keep the Convex translation query subscribed while the visible route is mounted.
-5. Trigger `translations:ensure` from an effect only when `generate: true`; warmup callers use source data without mounting this hook.
-6. Ensure rerenders do not create client request storms while server deduplication remains the correctness boundary.
-7. Run unit tests, lint, and build.
-
-**Suggested commit:**
-
-```bash
-git add src/data/useLocalizedFields.ts src/lib/localized-content.ts src/lib/localized-content.test.ts src/data/hooks.ts
-
-git commit -m "feat: add reactive localized-content hook"
-```
-
----
-
-## Task 9: Prove the task vertical slice
-
-**Objective:** Complete one real English/Singlish-to-Burmese task flow through Today and task detail.
-
-**Files:**
-
-- Modify: `src/routes/tasks.tsx`
-- Modify: `src/routes/task-view.tsx`
-- Modify: `src/components/Markdown.tsx`
-- Modify: `src/locales/en.json`
-- Modify: `src/locales/id.json`
-- Modify: `src/locales/my.json`
-- Modify: `convex/translations.test.ts`
-
-**Steps:**
-
-1. Add failing tests for task title/note translation and stable wiki targets.
-2. On the visible Tasks/Today route, request title and visible note fields for rendered task rows.
-3. On task detail, request title and note and support a localized “Show original” action.
-4. Keep task editing bound to `task.title` and `task.note`, never generated values.
-5. Ensure marking done/undone does not invalidate text translation.
-6. Test source-first rendering, live replacement, provider failure fallback, source edit invalidation, and link navigation.
-7. Have the Burmese helper review the real POC on Android before expansion.
-8. Run all validation commands.
-
-**Suggested commit:**
-
-```bash
-git add src/routes/tasks.tsx src/routes/task-view.tsx src/components/Markdown.tsx src/locales/en.json src/locales/id.json src/locales/my.json convex/translations.test.ts
-
-git commit -m "feat: translate fetched task content reactively"
-```
-
----
-
-## Task 10: Extend lazy translation to routines and Shopping
-
-**Objective:** Apply the proven path to recurring instructions and active shopping rows.
-
-**Files:**
-
-- Modify: `src/routes/routines/index.tsx`
-- Modify: `src/routes/routines/view.tsx`
-- Modify: `src/routes/shopping.tsx`
-- Modify: `src/routes/shopping-view.tsx`
-- Modify: `src/locales/en.json`
-- Modify: `src/locales/id.json`
-- Modify: `src/locales/my.json`
-- Modify: `convex/translations.test.ts`
-
-**Steps:**
-
-1. Add routine title/description and grocery name test cases.
-2. Request only visible routine fields on the index and detail routes.
-3. Request only active Shopping row names.
-4. Preserve source values in every create/edit control.
-5. Confirm count/status updates do not create new translation requests.
-6. Verify helper-authored Burmese shopping names can appear in English when fetched by the employer.
-7. Run tests, i18n validation, lint, and build.
-
-**Suggested commit:**
-
-```bash
-git add src/routes/routines src/routes/shopping.tsx src/routes/shopping-view.tsx src/locales convex/translations.test.ts
-
-git commit -m "feat: translate fetched routines and shopping items"
-```
-
----
-
-## Task 11: Extend lazy translation to pages, Today rules, and Search
-
-**Objective:** Localize rule/item content and searchable labels without translating entire page bodies eagerly.
-
-**Files:**
-
-- Modify: `src/routes/pages/view.tsx`
-- Modify: `src/routes/items.tsx`
-- Modify: `src/routes/rules.tsx`
-- Modify: `src/routes/search.tsx`
-- Modify: `src/components/WikiLinkSuggestions.tsx`
-- Modify: `src/components/LinkAutocomplete.tsx`
-- Modify: `src/data/hooks.ts`
-- Modify: `convex/today.ts`
-- Modify: `convex/pages.ts`
-- Modify: `convex/translations.test.ts`
-
-**Steps:**
-
-1. Add page title/content/location and canonical-link preservation tests.
-2. Translate title/location on catalogs and title/content/location on detail.
-3. Translate visible pinned-rule title/content on Today.
-4. Leave `localName` and legacy `localContent` unchanged.
-5. When Search opens, request only title/name fields for its bounded catalog; search both source and ready translations.
-6. Show localized wiki suggestion labels while inserting the same stable page identity.
-7. Keep list/search queries from returning every translated page body.
-8. Verify a Burmese wiki label still navigates to the original page ID.
-9. Run tests, Convex sync, i18n validation, lint, and build.
-
-**Suggested commit:**
-
-```bash
-git add src/routes/pages/view.tsx src/routes/items.tsx src/routes/rules.tsx src/routes/search.tsx src/components/WikiLinkSuggestions.tsx src/components/LinkAutocomplete.tsx src/data/hooks.ts convex/today.ts convex/pages.ts convex/translations.test.ts
-
-git commit -m "feat: translate fetched pages and searchable labels"
-```
-
----
-
-## Task 12: Add diagnostics, update architecture docs, and release
-
-**Objective:** Close operational gaps, replace stale plan decisions, and release the accepted feature as `0.1.0`.
-
-**Files:**
-
-- Modify: `convex/translations.ts`
-- Modify: `docs/plans/PLAN.md`
-- Create: `docs/adr/002-lazy-normalized-content-translation.md` (or next available ADR number)
-- Modify via npm: `package.json`, `package-lock.json`
-
-**Steps:**
-
-1. Add an owner/admin bounded query for failed translation metadata and usage diagnostics without returning secrets.
-2. Update `docs/plans/PLAN.md` V1/V2 and §6.10 statements that claim translation happens on save or uses only embedded/manual fields.
-3. Record the final provider, privacy posture, lazy lifecycle, field-level table, and browser-model decision in an ADR.
-4. Verify no blanket translation/backfill command exists.
-5. Run the complete acceptance matrix on development with English and Burmese accounts.
-6. Verify on the helper's Android phone that source fallback, live replacement, Noto Sans rendering, links, and language switching behave correctly.
-7. Set the version through npm rather than hand-editing manifests:
-
-   ```bash
-   npm version 0.1.0 --no-git-tag-version
-   ```
-
-8. Run:
-
-   ```bash
-   npm test
-   npm run check:i18n
-   npm run lint
-   npm run build
-   npx convex dev --once
-   git diff --check
-   ```
-
-9. Review provider usage/quota and confirm no household source text or credentials appear in logs.
-10. Commit the release only after user acceptance.
-
-**Suggested commit:**
-
-```bash
-git add convex/translations.ts docs/plans/PLAN.md docs/adr package.json package-lock.json
-
-git commit -m "docs: finalize lazy translation architecture"
-```
+- Voice input, speech transcription, or TTS
+- Translation on save
+- Blanket or member-join backfills
+- Translating every UI-supported locale
+- Automatic background retry chains
+- Provider-selection or translation-control UI
+- Any application mutation for changing the auto-translation feature flag
+- Manual editing of generated translations in the first release
+- Arbitrary Markdown page translation before structural segmentation exists
+- Multilingual semantic Search in the first release
+- Certified translation for legal, medical, or safety-critical content
 
 ---
 
@@ -862,11 +505,5 @@ git commit -m "docs: finalize lazy translation architecture"
 
 - Convex queries and reactivity: <https://docs.convex.dev/functions/query-functions>
 - Convex actions: <https://docs.convex.dev/functions/actions>
-- DeepL API Free usage limits: <https://developers.deepl.com/docs/resources/usage-limits>
-- DeepL Translate API: <https://developers.deepl.com/api-reference/translate>
-- DeepL Write API: <https://developers.deepl.com/api-reference/improve-text>
-- DeepL supported languages/features: <https://developers.deepl.com/docs/getting-started/supported-languages>
-- Chrome built-in Translator API: <https://developer.chrome.com/docs/ai/translator-api>
-- Chrome Prompt API requirements: <https://developer.chrome.com/docs/ai/prompt-api>
-- Transformers.js browser inference: <https://huggingface.co/docs/transformers.js/main/en/index>
-- NLLB-200 distilled model card: <https://huggingface.co/facebook/nllb-200-distilled-600M>
+- Convex scheduled functions: <https://docs.convex.dev/scheduling/scheduled-functions>
+- Convex testing: <https://docs.convex.dev/testing/convex-test>

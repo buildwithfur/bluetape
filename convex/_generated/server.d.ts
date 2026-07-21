@@ -26,6 +26,8 @@ import type { DataModel } from "./dataModel.js";
  */
 type Env = {
   readonly ALLOW_DEV_WIPE: string | undefined;
+  readonly OPENROUTER_API_KEY: string | undefined;
+  readonly OPENROUTER_TRANSLATION_MODEL: string | undefined;
 };
 
 /**

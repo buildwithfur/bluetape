@@ -52,6 +52,7 @@ async function resolveAgentInFamily(
       displayName: "API Agent",
       locale: "en",
       timezone: "Asia/Singapore",
+      autoTranslateEnabled: false,
     });
   }
 

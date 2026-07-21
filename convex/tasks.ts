@@ -181,6 +181,23 @@ export const remove = mutation({
     if (!canDelete) {
       throw new Error("Only the task creator or a family admin can delete this task");
     }
+    const translations = await ctx.db
+      .query("contentTranslations")
+      .withIndex(
+        "by_entity_field_locale",
+        (q) =>
+          q
+            .eq("familyId", task.familyId)
+            .eq("entityType", "task")
+            .eq("entityId", args.taskId),
+      )
+      .take(21);
+    if (translations.length > 20) {
+      throw new Error("Too many cached translations for this task");
+    }
+    for (const translation of translations) {
+      await ctx.db.delete(translation._id);
+    }
     await ctx.db.delete(args.taskId);
     return null;
   },

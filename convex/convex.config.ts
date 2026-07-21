@@ -14,5 +14,9 @@ export default defineApp({
      * Never set on production — the gate throws otherwise.
      */
     ALLOW_DEV_WIPE: v.optional(v.string()),
+    /** Server-only OpenRouter credentials for on-demand text translation. */
+    OPENROUTER_API_KEY: v.optional(v.string()),
+    /** Optional override; defaults to DeepSeek V4 Flash in the adapter. */
+    OPENROUTER_TRANSLATION_MODEL: v.optional(v.string()),
   },
 });

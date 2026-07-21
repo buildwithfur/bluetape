@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { query, mutation, internalQuery } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { requireFamilyOwner } from "./permissions";
+import { sha256Hex } from "./lib/sha256";
 
 /**
  * Per-family agent API keys for the HTTP /api/* surface.
@@ -22,15 +23,6 @@ function generateKey(): string {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-/** SHA-256 of a string, returned as lowercase hex. */
-async function sha256Hex(input: string): Promise<string> {
-  const data = new TextEncoder().encode(input);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(digest), (b) =>
-    b.toString(16).padStart(2, "0"),
-  ).join("");
 }
 
 // ─── Owner-gated management ────────────────────────────────────────────

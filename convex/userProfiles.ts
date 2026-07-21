@@ -50,6 +50,7 @@ export const create = mutation({
       displayName: args.displayName,
       locale: args.locale ?? "en",
       timezone: args.timezone ?? "Asia/Singapore",
+      autoTranslateEnabled: false,
     });
     return ctx.db.get(profileId);
   },
@@ -80,6 +81,7 @@ export const ensure = mutation({
       displayName,
       locale: "en",
       timezone: "Asia/Singapore",
+      autoTranslateEnabled: false,
     });
     return ctx.db.get(profileId);
   },

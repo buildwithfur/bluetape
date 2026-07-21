@@ -3,7 +3,8 @@ import { mutation, env } from "./_generated/server";
 /**
  * Dev-only nuclear option: wipes ALL application data (families, members,
  * pages, routines, tasks, groceryItems, routineCompletions, links,
- * userProfiles, apiKeys, secrets). Leaves the auth `users` table intact so
+ * userProfiles, contentTranslations, apiKeys, secrets). Leaves the auth
+ * `users` table intact so
  * accounts can still sign in (they'll re-bootstrap a profile + family).
  *
  * Gated by the `ALLOW_DEV_WIPE` env var, which must equal "true". This var
@@ -30,6 +31,7 @@ export const wipeEverything = mutation({
       "pages",
       "links",
       "routines",
+      "contentTranslations",
       "tasks",
       "groceryItems",
       "routineCompletions",

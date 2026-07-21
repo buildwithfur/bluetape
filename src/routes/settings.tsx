@@ -82,6 +82,39 @@ export default function Settings() {
             {t(message === 'failed' ? 'settings.languageSaveFailed' : 'settings.languageSaved')}
           </p>
         )}
+        <div className="page-px mt-5 border-t border-border-subtle py-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[16px] font-medium text-text-primary">
+                {t('settings.autoTranslate')}
+              </p>
+              <p className="mt-1 text-sm leading-relaxed text-text-secondary">
+                {t('settings.autoTranslateDescription')}
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={profile.autoTranslateEnabled === true}
+              aria-label={t('settings.autoTranslate')}
+              disabled
+              className={cn(
+                'relative mt-0.5 h-7 w-12 shrink-0 cursor-not-allowed rounded-full opacity-70',
+                profile.autoTranslateEnabled === true ? 'bg-accent' : 'bg-border-strong',
+              )}
+            >
+              <span
+                className={cn(
+                  'absolute left-1 top-1 h-5 w-5 rounded-full bg-surface-floating shadow-sm transition-transform',
+                  profile.autoTranslateEnabled === true && 'translate-x-5',
+                )}
+              />
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-text-tertiary">
+            {t('settings.autoTranslateManaged')}
+          </p>
+        </div>
       </section>
     </>
   )
