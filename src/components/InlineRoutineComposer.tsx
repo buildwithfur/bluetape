@@ -96,6 +96,8 @@ export function InlineRoutineComposer({ frequency }: { frequency: Frequency }) {
           className="h-9 w-full bg-transparent text-[14px] text-text-secondary placeholder:text-text-disabled focus:outline-none"
         />
 
+        <WikiLinkSuggestions value={description} onChange={setDescription} />
+
         {frequency === 'weekly' && (
           <fieldset className="mt-2">
             <legend className="sr-only">{t('routine.field.dayOfWeek')}</legend>

@@ -95,15 +95,18 @@ export default function RoutineEdit() {
             <WikiLinkSuggestions value={title} onChange={setTitle} />
           </div>
 
-          <label className="flex flex-col gap-1.5">
-            <span className="label-caps text-text-tertiary">{t('routine.field.description')}</span>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-              className="px-3 py-2 rounded-xs bg-surface border border-border-line text-text-primary focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
-            />
-          </label>
+          <div className="flex flex-col gap-1.5">
+            <label className="flex flex-col gap-1.5">
+              <span className="label-caps text-text-tertiary">{t('routine.field.description')}</span>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={2}
+                className="px-3 py-2 rounded-xs bg-surface border border-border-line text-text-primary focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+              />
+            </label>
+            <WikiLinkSuggestions value={description} onChange={setDescription} />
+          </div>
 
           <fieldset>
             <legend className="label-caps text-text-tertiary mb-2">{t('routine.field.frequency')}</legend>

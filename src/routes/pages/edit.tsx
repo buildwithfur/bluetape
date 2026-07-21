@@ -5,6 +5,7 @@ import { TopBar } from '@/components/AppShell'
 import { Button } from '@/components/Button'
 import { EmptyState } from '@/components/EmptyState'
 import { PhotoCapture } from '@/components/PhotoCapture'
+import { WikiLinkSuggestions } from '@/components/WikiLinkSuggestions'
 import {
   usePageBySlug,
   useSavePage,
@@ -127,16 +128,19 @@ export default function PageEdit() {
 
         {type === 'item' && (
           <>
-            <label className="flex flex-col gap-1.5">
-              <span className="text-[16px] font-medium text-ink">{t('page.field.content')}</span>
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                rows={5}
-                placeholder={t('page.field.contentPlaceholder')}
-                className="resize-y rounded-xs border border-border-line bg-surface px-3 py-3 text-text-primary placeholder:text-text-tertiary focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
-              />
-            </label>
+            <div className="flex flex-col gap-1.5">
+              <label className="flex flex-col gap-1.5">
+                <span className="text-[16px] font-medium text-ink">{t('page.field.content')}</span>
+                <textarea
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  rows={5}
+                  placeholder={t('page.field.contentPlaceholder')}
+                  className="resize-y rounded-xs border border-border-line bg-surface px-3 py-3 text-text-primary placeholder:text-text-tertiary focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+                />
+              </label>
+              <WikiLinkSuggestions value={content} onChange={setContent} />
+            </div>
 
             <div>
               <span className="label-caps text-text-tertiary mb-2 block">{t('page.field.photo')}</span>

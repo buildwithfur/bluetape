@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { Markdown } from '@/components/Markdown'
 import { ShareButton } from '@/components/ShareButton'
 import { OverflowMenu } from '@/components/OverflowMenu'
+import { WikiLinkSuggestions } from '@/components/WikiLinkSuggestions'
 import {
   useCurrentRole,
   useCurrentProfile,
@@ -165,25 +166,30 @@ export default function TaskView() {
             <CheckCircle checked={task.status === 'done'} size={26} />
           </button>
           {editingTitle ? (
-            <input
-              ref={titleInputRef}
-              value={titleDraft}
-              onChange={(event) => setTitleDraft(event.target.value)}
-              onBlur={() => void saveTitle()}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault()
-                  void saveTitle()
-                }
-                if (event.key === 'Escape') {
-                  setTitleDraft(authoringTitle)
-                  setSaveError(false)
-                  setEditingTitle(false)
-                }
-              }}
-              aria-label={t('routine.field.title')}
-              className="min-w-0 flex-1 rounded-xs border border-accent bg-surface px-2 py-1 text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink outline-none ring-2 ring-accent/20"
-            />
+            <div className="min-w-0 flex-1">
+              <input
+                ref={titleInputRef}
+                value={titleDraft}
+                onChange={(event) => setTitleDraft(event.target.value)}
+                onBlur={() => void saveTitle()}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    void saveTitle()
+                  }
+                  if (event.key === 'Escape') {
+                    setTitleDraft(authoringTitle)
+                    setSaveError(false)
+                    setEditingTitle(false)
+                  }
+                }}
+                aria-label={t('routine.field.title')}
+                className="w-full rounded-xs border border-accent bg-surface px-2 py-1 text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink outline-none ring-2 ring-accent/20"
+              />
+              <div className="mt-1">
+                <WikiLinkSuggestions value={titleDraft} onChange={setTitleDraft} />
+              </div>
+            </div>
           ) : canEdit ? (
             <h1
               tabIndex={0}
@@ -215,22 +221,27 @@ export default function TaskView() {
         <section className="mt-6 border-t border-border-subtle pt-5">
           <div className="label-caps mb-2 text-text-tertiary">{t('record.note')}</div>
           {editingNote ? (
-            <textarea
-              ref={noteInputRef}
-              value={noteDraft}
-              onChange={(event) => setNoteDraft(event.target.value)}
-              onBlur={() => void saveNote()}
-              onKeyDown={(event) => {
-                if (event.key === 'Escape') {
-                  setNoteDraft(authoringNote)
-                  setSaveError(false)
-                  setEditingNote(false)
-                }
-              }}
-              rows={3}
-              aria-label={t('record.note')}
-              className="w-full resize-none rounded-xs border border-accent bg-surface px-3 py-2 text-[17px] leading-[1.6] text-text-primary outline-none ring-2 ring-accent/20"
-            />
+            <div>
+              <textarea
+                ref={noteInputRef}
+                value={noteDraft}
+                onChange={(event) => setNoteDraft(event.target.value)}
+                onBlur={() => void saveNote()}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    setNoteDraft(authoringNote)
+                    setSaveError(false)
+                    setEditingNote(false)
+                  }
+                }}
+                rows={3}
+                aria-label={t('record.note')}
+                className="w-full resize-none rounded-xs border border-accent bg-surface px-3 py-2 text-[17px] leading-[1.6] text-text-primary outline-none ring-2 ring-accent/20"
+              />
+              <div className="mt-1">
+                <WikiLinkSuggestions value={noteDraft} onChange={setNoteDraft} />
+              </div>
+            </div>
           ) : canEdit ? (
             <div
               tabIndex={0}

@@ -12,6 +12,7 @@ import { Markdown } from '@/components/Markdown'
 import { Button } from '@/components/Button'
 import { BottomSheet } from '@/components/BottomSheet'
 import { ShareButton } from '@/components/ShareButton'
+import { WikiLinkSuggestions } from '@/components/WikiLinkSuggestions'
 import { OverflowMenu } from '@/components/OverflowMenu'
 import { PhotoCapture } from '@/components/PhotoCapture'
 import {
@@ -313,22 +314,27 @@ export default function PageView({ recordType }: { recordType?: PageType }) {
 
         <div className="page-px pb-6 pt-3">
           {editingContent ? (
-            <textarea
-              ref={contentInputRef}
-              value={contentDraft}
-              onChange={(event) => setContentDraft(event.target.value)}
-              onBlur={() => void saveContent()}
-              onKeyDown={(event) => {
-                if (event.key === 'Escape') {
-                  setContentDraft(authoringContent)
-                  setSaveError(false)
-                  setEditingContent(false)
-                }
-              }}
-              rows={8}
-              aria-label={t('page.field.content')}
-              className="min-h-40 w-full resize-y rounded-xs border border-accent bg-surface px-3 py-2 text-[17px] leading-[1.6] text-text-primary outline-none ring-2 ring-accent/20"
-            />
+            <div>
+              <textarea
+                ref={contentInputRef}
+                value={contentDraft}
+                onChange={(event) => setContentDraft(event.target.value)}
+                onBlur={() => void saveContent()}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    setContentDraft(authoringContent)
+                    setSaveError(false)
+                    setEditingContent(false)
+                  }
+                }}
+                rows={8}
+                aria-label={t('page.field.content')}
+                className="min-h-40 w-full resize-y rounded-xs border border-accent bg-surface px-3 py-2 text-[17px] leading-[1.6] text-text-primary outline-none ring-2 ring-accent/20"
+              />
+              <div className="mt-1">
+                <WikiLinkSuggestions value={contentDraft} onChange={setContentDraft} />
+              </div>
+            </div>
           ) : isAdmin ? (
             <div
               role="button"

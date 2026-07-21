@@ -147,7 +147,7 @@ function insertWikiLink(value: string, title: string, range: MatchRange | null):
   return `${value}${spacer}[[${title}]]`
 }
 
-/** Suggest existing item/rule records while a task or routine title is typed. */
+/** Suggest existing item/rule records while wiki-capable text is authored. */
 export function WikiLinkSuggestions({
   value,
   onChange,
@@ -199,6 +199,7 @@ export function WikiLinkSuggestions({
         <button
           key={page._id}
           type="button"
+          onPointerDown={(event) => event.preventDefault()}
           onClick={() => onChange(insertWikiLink(value, page.title, range))}
           className="flex min-h-11 w-full items-center gap-3 border-b border-border-subtle px-3 py-2 text-left last:border-b-0 hover:bg-surface-hover active:bg-surface-active"
         >

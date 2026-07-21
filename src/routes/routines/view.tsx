@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { Markdown } from '@/components/Markdown'
 import { OverflowMenu } from '@/components/OverflowMenu'
 import { ShareButton } from '@/components/ShareButton'
+import { WikiLinkSuggestions } from '@/components/WikiLinkSuggestions'
 import {
   useCurrentRole,
   useDeleteRoutine,
@@ -157,34 +158,44 @@ export default function RoutineView() {
       <article className="page-px py-6">
         <div>
           {editingTitle ? (
-            <input
-              ref={titleInputRef}
-              value={titleDraft}
-              onChange={(event) => setTitleDraft(event.target.value)}
-              onBlur={() => void saveTitle()}
+            <div>
+              <input
+                ref={titleInputRef}
+                value={titleDraft}
+                onChange={(event) => setTitleDraft(event.target.value)}
+                onBlur={() => void saveTitle()}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    void saveTitle()
+                  }
+                  if (event.key === 'Escape') {
+                    setTitleDraft(authoringTitle)
+                    setSaveError(false)
+                    setEditingTitle(false)
+                  }
+                }}
+                aria-label={t('routine.field.title')}
+                className="w-full rounded-xs border border-accent bg-surface px-2 py-1 text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink outline-none ring-2 ring-accent/20"
+              />
+              <div className="mt-1">
+                <WikiLinkSuggestions value={titleDraft} onChange={setTitleDraft} />
+              </div>
+            </div>
+          ) : canManage ? (
+            <h1
+              tabIndex={0}
+              onClick={(event) => {
+                if (!(event.target as Element).closest('a')) setEditingTitle(true)
+              }}
               onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault()
-                  void saveTitle()
-                }
-                if (event.key === 'Escape') {
-                  setTitleDraft(authoringTitle)
-                  setSaveError(false)
-                  setEditingTitle(false)
+                if (event.key === 'Enter' && !(event.target as Element).closest('a')) {
+                  setEditingTitle(true)
                 }
               }}
-              aria-label={t('routine.field.title')}
-              className="w-full rounded-xs border border-accent bg-surface px-2 py-1 text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink outline-none ring-2 ring-accent/20"
-            />
-          ) : canManage ? (
-            <h1>
-              <button
-                type="button"
-                onClick={() => setEditingTitle(true)}
-                className="w-full rounded-xs px-2 py-1 text-left text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink transition hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 active:bg-surface-active"
-              >
-                {wikiPlainText(routine.title)}
-              </button>
+              className="w-full cursor-text rounded-xs px-2 py-1 text-left text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink transition hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 active:bg-surface-active"
+            >
+              <Markdown content={routine.title} inline />
             </h1>
           ) : (
             <h1 className="min-w-0 px-2 py-1 text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink">
@@ -197,34 +208,46 @@ export default function RoutineView() {
         <section className="mt-6 border-t border-border-subtle pt-5">
           <div className="label-caps mb-2 text-text-tertiary">{t('routine.field.description')}</div>
           {editingNote ? (
-            <textarea
-              ref={noteInputRef}
-              value={noteDraft}
-              onChange={(event) => setNoteDraft(event.target.value)}
-              onBlur={() => void saveNote()}
+            <div>
+              <textarea
+                ref={noteInputRef}
+                value={noteDraft}
+                onChange={(event) => setNoteDraft(event.target.value)}
+                onBlur={() => void saveNote()}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    setNoteDraft(authoringNote)
+                    setSaveError(false)
+                    setEditingNote(false)
+                  }
+                }}
+                rows={3}
+                aria-label={t('routine.field.description')}
+                className="w-full resize-none rounded-xs border border-accent bg-surface px-3 py-2 text-[17px] leading-[1.6] text-text-primary outline-none ring-2 ring-accent/20"
+              />
+              <div className="mt-1">
+                <WikiLinkSuggestions value={noteDraft} onChange={setNoteDraft} />
+              </div>
+            </div>
+          ) : canManage ? (
+            <div
+              tabIndex={0}
+              onClick={(event) => {
+                if (!(event.target as Element).closest('a')) setEditingNote(true)
+              }}
               onKeyDown={(event) => {
-                if (event.key === 'Escape') {
-                  setNoteDraft(authoringNote)
-                  setSaveError(false)
-                  setEditingNote(false)
+                if (event.key === 'Enter' && !(event.target as Element).closest('a')) {
+                  setEditingNote(true)
                 }
               }}
-              rows={3}
-              aria-label={t('routine.field.description')}
-              className="w-full resize-none rounded-xs border border-accent bg-surface px-3 py-2 text-[17px] leading-[1.6] text-text-primary outline-none ring-2 ring-accent/20"
-            />
-          ) : canManage ? (
-            <button
-              type="button"
-              onClick={() => setEditingNote(true)}
               className="min-h-11 w-full rounded-xs px-2 py-2 text-left text-[17px] leading-[1.6] transition hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 active:bg-surface-active"
             >
               {routine.description ? (
-                <span className="text-text-primary">{wikiPlainText(routine.description)}</span>
+                <Markdown content={routine.description} />
               ) : (
                 <span className="text-text-tertiary">{t('routine.field.descriptionPlaceholder')}</span>
               )}
-            </button>
+            </div>
           ) : routine.description ? (
             <Markdown content={routine.description} />
           ) : null}
