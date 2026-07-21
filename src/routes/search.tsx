@@ -10,7 +10,7 @@ import { pagePath, recordPath } from '@/lib/record-route'
 import { wikiPlainText } from '@/lib/wiki'
 import type { Doc } from '@convex/_generated/dataModel'
 
-/** Modal command palette — searches notes, rules, tasks (PLAN.md §6.7).
+/** Modal command palette — searches notes, rules, recipes, and tasks (PLAN.md §6.7).
  * Routines are excluded. On mobile the query dock stays above the keyboard,
  * with results in a sheet behind it. */
 export function SearchPalette() {
@@ -51,9 +51,9 @@ export function SearchPalette() {
   if (!open) return null
 
   const q = query.trim().toLowerCase()
-  const { items, rules } = results
+  const { items, rules, recipes } = results
   const taskMatches = results.tasks
-  const anyResults = items.length > 0 || rules.length > 0 || taskMatches.length > 0
+  const anyResults = items.length > 0 || rules.length > 0 || recipes.length > 0 || taskMatches.length > 0
 
   function go(path: string) {
     setOpen(false)
@@ -66,6 +66,7 @@ export function SearchPalette() {
     query,
     items,
     rules,
+    recipes,
     taskMatches,
     anyResults,
     createItem,
@@ -146,6 +147,7 @@ function SearchResults({
   query,
   items,
   rules,
+  recipes,
   taskMatches,
   anyResults,
   createItem,
@@ -155,6 +157,7 @@ function SearchResults({
   query: string
   items: Doc<'pages'>[]
   rules: Doc<'pages'>[]
+  recipes: Doc<'recipes'>[]
   taskMatches: Doc<'tasks'>[]
   anyResults: boolean
   createItem: (title: string) => void
@@ -196,6 +199,18 @@ function SearchResults({
         <Group label={t('search.group.rules')}>
           {rules.map((p) => (
             <ResultRow key={p._id} title={p.title} onClick={() => go(pagePath(p))} />
+          ))}
+        </Group>
+      )}
+      {recipes.length > 0 && (
+        <Group label={t('search.group.recipes')}>
+          {recipes.map((recipe) => (
+            <ResultRow
+              key={recipe._id}
+              title={wikiPlainText(recipe.title)}
+              sub={recipe.sourceDomain}
+              onClick={() => go(recordPath('recipe', recipe._id))}
+            />
           ))}
         </Group>
       )}

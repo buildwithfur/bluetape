@@ -46,10 +46,14 @@ export function createMarkdownIt(): MarkdownIt {
     const resolved = resolveWikiTarget(target, env)
     const display = label && label.length ? label : resolved?.title ?? target
     if (resolved) {
-      const collection = resolved.type === 'item' ? 'notes' : 'rules'
+      const collection = resolved.type === 'item'
+        ? 'notes'
+        : resolved.type === 'rule'
+          ? 'rules'
+          : 'recipes'
       return `<a class="wikilink" href="/${collection}/${resolved.id}">${escapeHtml(display)}</a>`
     }
-    if (target.toLowerCase().startsWith('page:')) {
+    if (target.toLowerCase().startsWith('page:') || target.toLowerCase().startsWith('recipe:')) {
       return `<span class="wikilink broken">${escapeHtml(display)}</span>`
     }
     // Broken link — propose creation. Surface-floating action target.
@@ -73,7 +77,7 @@ export function createMarkdownIt(): MarkdownIt {
 function resolveWikiTarget(
   target: string,
   env: RenderEnv | undefined,
-): { id: string; type: 'item' | 'rule'; slug: string; title: string } | null {
+): { id: string; type: 'item' | 'rule' | 'recipe'; slug?: string; title: string } | null {
   if (!env?.targetMap) return null
   const map = env.targetMap
   // Case-insensitive title resolution (PLAN.md §7 Edge cases).
@@ -120,12 +124,23 @@ export function wikiPlainText(content: string): string {
 export function wikiAuthoringText(
   content: string,
   pages: Array<{ _id: string; title: string }>,
+  recipes: Array<{ _id: string; title: string }> = [],
 ): string {
   const titlesById = new Map(pages.map((page) => [page._id, page.title]))
-  return content.replace(
+  const recipeTitlesById = new Map(recipes.map((recipe) => [recipe._id, recipe.title]))
+  const pagesExpanded = content.replace(
     /\[\[page:([^\]|]+)(?:\|([^\]]+))?\]\]/g,
     (original, rawId, rawLabel) => {
       const title = titlesById.get(String(rawId).trim())
+      if (!title) return original
+      const label = String(rawLabel || title).trim()
+      return label === title ? `[[${title}]]` : `[[${title}|${label}]]`
+    },
+  )
+  return pagesExpanded.replace(
+    /\[\[recipe:([^\]|]+)(?:\|([^\]]+))?\]\]/g,
+    (original, rawId, rawLabel) => {
+      const title = recipeTitlesById.get(String(rawId).trim())
       if (!title) return original
       const label = String(rawLabel || title).trim()
       return label === title ? `[[${title}]]` : `[[${title}|${label}]]`

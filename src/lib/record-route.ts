@@ -1,6 +1,6 @@
 import type { Doc } from '@convex/_generated/dataModel'
 
-export type RecordKind = 'item' | 'rule' | 'task' | 'routine' | 'shopping'
+export type RecordKind = 'item' | 'rule' | 'task' | 'routine' | 'shopping' | 'recipe'
 
 export function recordPath(kind: RecordKind, id: string): string {
   switch (kind) {
@@ -14,6 +14,8 @@ export function recordPath(kind: RecordKind, id: string): string {
       return `/routines/${id}`
     case 'shopping':
       return `/shopping/${id}`
+    case 'recipe':
+      return `/recipes/${id}`
   }
 }
 

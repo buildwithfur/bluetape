@@ -4,31 +4,32 @@ import { api } from '@convex/_generated/api'
 import type { Id } from '@convex/_generated/dataModel'
 import { useCurrentProfile } from '@/data/hooks'
 
-export type LocalizedTaskField = {
-  entityType: 'task'
-  entityId: Id<'tasks'>
-  field: 'title' | 'note'
-  source: string
+export type LocalizedField =
+  | { entityType: 'task'; entityId: Id<'tasks'>; field: 'title' | 'note'; source: string }
+  | { entityType: 'recipe'; entityId: Id<'recipes'>; field: 'title'; source: string }
+  | { entityType: 'recipeIngredient'; entityId: Id<'recipeIngredients'>; field: 'text'; source: string }
+  | { entityType: 'recipeStep'; entityId: Id<'recipeSteps'>; field: 'text'; source: string }
+
+export type LocalizedTaskField = Extract<LocalizedField, { entityType: 'task' }>
+type TranslationRef =
+  | { entityType: 'task'; entityId: Id<'tasks'>; field: 'title' | 'note' }
+  | { entityType: 'recipe'; entityId: Id<'recipes'>; field: 'title' }
+  | { entityType: 'recipeIngredient'; entityId: Id<'recipeIngredients'>; field: 'text' }
+  | { entityType: 'recipeStep'; entityId: Id<'recipeSteps'>; field: 'text' }
+
+function fieldKey(field: Pick<LocalizedField, 'entityType' | 'entityId' | 'field'>) {
+  return `${field.entityType}:${field.entityId}:${field.field}`
 }
 
-function fieldKey(entityId: Id<'tasks'>, field: 'title' | 'note') {
-  return `${entityId}:${field}`
-}
-
-export function useLocalizedTaskFields(fields: LocalizedTaskField[]) {
+export function useLocalizedFields(fields: LocalizedField[]) {
   const profile = useCurrentProfile()
   const enabled = profile?.autoTranslateEnabled === true
   const stableKey = fields
-    .map((item) => `${fieldKey(item.entityId, item.field)}:${item.source}`)
+    .map((item) => `${fieldKey(item)}:${item.source}`)
     .join('\u0000')
   const refs = useMemo(
-    () => fields.map((item) => ({
-      entityType: item.entityType,
-      entityId: item.entityId,
-      field: item.field,
-    })),
-    // The serialized key deliberately includes source text so display values
-    // refresh immediately after an edit, before the backend cache catches up.
+    () => fields.map(({ entityType, entityId, field }) => ({ entityType, entityId, field })) as TranslationRef[],
+    // Source participates in identity so an edit immediately refreshes display.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [stableKey],
   )
@@ -37,29 +38,43 @@ export function useLocalizedTaskFields(fields: LocalizedTaskField[]) {
     enabled && refs.length > 0 ? { fields: refs } : 'skip',
   )
   const ensure = useMutation(api.translations.ensureForFields)
-
   const needsTranslation = response?.results.some(
     (result) => result.state === 'missing' || result.state === 'failed',
   )
+
   useEffect(() => {
     if (!enabled || refs.length === 0 || !needsTranslation) return
     void ensure({ fields: refs }).catch(() => undefined)
   }, [enabled, ensure, needsTranslation, refs])
 
   const results = new Map(
-    response?.results.map((result) => [fieldKey(result.entityId, result.field), result]),
+    response?.results.map((result) => [fieldKey(result), result]),
   )
 
   return {
     enabled,
-    textFor(entityId: Id<'tasks'>, field: 'title' | 'note', source: string) {
-      const result = results.get(fieldKey(entityId, field))
+    textFor(field: LocalizedField) {
+      const result = results.get(fieldKey(field))
       return result?.state === 'ready' && result.translatedText
         ? result.translatedText
-        : source
+        : field.source
+    },
+    hasTranslation(field: Omit<LocalizedField, 'source'>) {
+      return results.get(fieldKey(field))?.state === 'ready'
+    },
+  }
+}
+
+/** Compatibility wrapper for the task screens shipped before recipes. */
+export function useLocalizedTaskFields(fields: LocalizedTaskField[]) {
+  const localized = useLocalizedFields(fields)
+  return {
+    enabled: localized.enabled,
+    textFor(entityId: Id<'tasks'>, field: 'title' | 'note', source: string) {
+      return localized.textFor({ entityType: 'task', entityId, field, source })
     },
     hasTranslation(entityId: Id<'tasks'>, field: 'title' | 'note') {
-      return results.get(fieldKey(entityId, field))?.state === 'ready'
+      return localized.hasTranslation({ entityType: 'task', entityId, field })
     },
   }
 }

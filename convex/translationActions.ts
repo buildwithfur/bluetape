@@ -32,7 +32,7 @@ export const processClaims = internalAction({
           id: item.providerId,
           text: item.protectedText.text,
           targetLocale: item.targetLocale,
-          mode: "instruction" as const,
+          mode: item.mode,
         })),
       );
       const byId = new Map(providerResults.map((result) => [result.id, result]));

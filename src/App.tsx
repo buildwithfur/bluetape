@@ -25,6 +25,10 @@ import PageView from '@/routes/pages/view'
 import PageEdit from '@/routes/pages/edit'
 import { useTranslation } from 'react-i18next'
 import Settings from '@/routes/settings'
+import RecipesIndex from '@/routes/recipes/index'
+import RecipeImport from '@/routes/recipes/import'
+import RecipeView from '@/routes/recipes/view'
+import RecipeEdit from '@/routes/recipes/edit'
 import i18n, { isSupportedLocale } from '@/i18n'
 
 function Splash() {
@@ -90,6 +94,10 @@ export default function App() {
             <Route path="/routines/:id" element={<RoutineView />} />
             <Route path="/routines/:id/edit" element={<RoutineEdit />} />
             <Route path="/tasks/:id" element={<TaskView />} />
+            <Route path="/recipes" element={<RecipesIndex />} />
+            <Route path="/recipes/import/:id" element={<RecipeImport />} />
+            <Route path="/recipes/:id" element={<RecipeView />} />
+            <Route path="/recipes/:id/edit" element={<RecipeEdit />} />
             <Route path="/shopping" element={<Shopping />} />
             <Route path="/shopping/:id" element={<ShoppingItemView />} />
             <Route path="/more" element={<More />} />

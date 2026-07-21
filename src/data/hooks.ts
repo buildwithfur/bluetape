@@ -184,6 +184,56 @@ export function useAllPages(enabled = true) {
   const familyId = useCurrentFamilyId()
   return useQuery(api.pages.listAll, familyId && enabled ? { familyId } : 'skip')
 }
+
+// ─── Recipes ───────────────────────────────────────────────────────────
+export function useRecipes(enabled = true) {
+  const familyId = useCurrentFamilyId()
+  return useQuery(api.recipes.list, familyId && enabled ? { familyId } : 'skip')
+}
+export function useRecipe(recipeId: string | undefined) {
+  return useQuery(api.recipes.get, recipeId ? { recipeId } : 'skip')
+}
+export function useRecipeImports() {
+  const familyId = useCurrentFamilyId()
+  return useQuery(api.recipes.listImports, familyId ? { familyId } : 'skip')
+}
+export function useRecipeImport(jobId: string | undefined) {
+  return useQuery(api.recipes.getImport, jobId ? { jobId } : 'skip')
+}
+export function useCreateRecipeImport() {
+  const familyId = useCurrentFamilyId()
+  const create = useMutation(api.recipes.createImport)
+  return (url: string) => {
+    if (!familyId) throw new Error('No active family')
+    return create({ familyId, url })
+  }
+}
+export function useRetryRecipeImport() {
+  const retry = useMutation(api.recipes.retryImport)
+  return (jobId: Id<'recipeImportJobs'>) => retry({ jobId })
+}
+export function usePublishRecipe() {
+  const publish = useMutation(api.recipes.publish)
+  return (input: {
+    jobId: Id<'recipeImportJobs'>
+    title: string
+    ingredients: string[]
+    steps: string[]
+  }) => publish(input)
+}
+export function useUpdateRecipe() {
+  const update = useMutation(api.recipes.update)
+  return (input: {
+    recipeId: Id<'recipes'>
+    title: string
+    ingredients: string[]
+    steps: string[]
+  }) => update(input)
+}
+export function useDeleteRecipe() {
+  const remove = useMutation(api.recipes.remove)
+  return (recipeId: Id<'recipes'>) => remove({ recipeId })
+}
 // ─── Shopping ────────────────────────────────────────────────────────────
 export function useShopping() {
   const familyId = useCurrentFamilyId()
@@ -211,6 +261,7 @@ export function useNavigationWarmup() {
 
   useToday(today, true)
   useRoutines()
+  useRecipes()
   useShopping()
 }
 
@@ -474,17 +525,19 @@ export function useUpdateProfile() {
 // ─── Search (client-side over family pages + tasks) ────────────────────
 export function useSearch(query: string, enabled = true) {
   const pages = useAllPages(enabled)
+  const recipes = useRecipes(enabled)
   const familyId = useCurrentFamilyId()
   const tasks = useQuery(
     api.tasks.list,
     familyId && enabled ? { familyId, status: 'pending' } : 'skip',
   )
   const q = query.trim().toLowerCase()
-  if (!q || !pages || !tasks) return { items: [], rules: [], tasks: [] }
+  if (!q || !pages || !tasks || !recipes) return { items: [], rules: [], recipes: [], tasks: [] }
   const matches = (s?: string) => !!s && s.toLowerCase().includes(q)
   return {
     items: pages.filter((p) => p.type === 'item' && (matches(p.title) || matches(p.content) || matches(p.location) || matches(p.localName))),
     rules: pages.filter((p) => p.type === 'rule' && (matches(p.title) || matches(p.content))),
+    recipes: recipes.filter((recipe) => matches(recipe.searchText)),
     tasks: tasks.filter((t) => matches(t.title)),
   }
 }

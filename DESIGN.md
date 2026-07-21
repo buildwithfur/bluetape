@@ -197,7 +197,7 @@ components:
 
 ## Overview
 
-Bluetape is a household coordination app used primarily by a household user on their phone every morning, and secondarily by an admin to manage content. It coordinates routines, one-off tasks, household notes (with optional photos and local-language translations), rules, and a shared grocery list — all interconnected by wiki-style `[[links]]`.
+Bluetape is a household coordination app used primarily by a household user on their phone every morning, and secondarily by an admin to manage content. It coordinates routines, one-off tasks, household notes (with optional photos and local-language translations), rules, imported family recipes, and a shared grocery list — with household reference content interconnected by wiki-style `[[links]]`.
 
 The physical scene: a phone held in a kitchen, sometimes under fluorescent light, sometimes bright tropical daylight. The user opens it to see what to do today, taps through to reference notes, and marks work done. They may not be fluent in English.
 
@@ -238,7 +238,7 @@ Typography is bilingual: **Satoshi** (geometric grotesque, via Fontshare) for En
 
 Mobile-first. The primary surface is a phone screen, max-width 420px, centered on desktop with a hairline frame. The employer's occasional desktop use renders the same content with a left rail replacing the bottom tab bar.
 
-A **bottom tab bar** carries 4 destinations (Today, Routines, Shopping, More) — thumb-reachable, iOS/Android muscle-memory. The active tab's icon and label render in `accent`; inactive tabs render in `text-tertiary`. The bar sits on `surface` with a `border-subtle` top hairline.
+A **bottom tab bar** carries 5 destinations (Tasks, Routines, Recipes, Shopping, More) — thumb-reachable, iOS/Android muscle-memory. The active tab's icon and label render in `accent`; inactive tabs render in `text-tertiary`. The bar sits on `surface` with a `border-subtle` top hairline. Labels keep the 11px `label-caps` treatment and no extra horizontal padding so all five destinations remain legible at 320px.
 
 A **sticky top bar** provides back navigation, contextual actions (Edit, overflow), and uses a translucent `background` with `backdrop-filter: blur(12px)` so content scrolls cleanly beneath.
 
@@ -275,7 +275,7 @@ Radius scale: `xs 8px` · `sm 12px` · `md 20px` · `lg 28px` (overlays only) ·
 - **Button — Primary.** Solid `accent` background, white text, `8px` radius, Satoshi Medium 14px. One per screen, maximum. Reserved for the single most important action (Save, Add). Hover darkens to `accent-hover`.
 - **Button — Secondary.** Transparent background, `ink-700` text, 1px `border`. For secondary actions.
 - **Button — Ghost.** Transparent, no border, `ink-700` text, `8px` radius. For icon-only actions and inline edits. Active state: `surface-active` bg + `scale(0.96)` press.
-- **Bottom Tab.** 4-column grid, `surface` background, `border-subtle` top hairline. Inactive: `text-tertiary`. Active: `accent`. Label is `label-caps`. Icons are Phosphor or Radix at `strokeWidth: 1.75`. Tap: `scale(0.95)`, 120ms ease-out.
+- **Bottom Tab.** 5-column grid, `surface` background, `border-subtle` top hairline. Inactive: `text-tertiary`. Active: `accent`. Label is `label-caps`. Icons are Phosphor or Radix at `strokeWidth: 1.75`. Tap: `scale(0.95)`, 120ms ease-out.
 - **Wiki Link.** The signature component. Blue (`navy-700`) text with a 1px `navy-300` underline. No background, no border-radius by default. On hover/tap: `navy-100` appears. Broken (target page doesn't exist): `text-tertiary` + dashed `border-strong` underline in default state, becoming `navy-700` on hover. This makes it visually obvious what still needs creating without shouting.
 - **List Row.** Full-width tappable row, `min-height: 56px` (above the 44px a11y floor for easy thumb use). `surface` background, `border-subtle` bottom hairline. Tap target is the whole row. Hover: `surface-hover`. Active: `surface-active` + `scale(0.98)`.
 - **Checkbox — Done.** A circular outline; checked state is a filled circle in `success-accent`. No green tile or banner — green appears *only* on this 16px circle. The accompanying text gets a subtle strikethrough that fades in over 150ms.

@@ -1,0 +1,1 @@
+"""Bluetape recipe extraction worker."""

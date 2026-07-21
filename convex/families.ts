@@ -301,7 +301,8 @@ export const rename = mutation({
 
 /**
  * Delete a family and all its content — owner only. Cleans up members,
- * pages, links, routines, tasks, groceryItems, routineCompletions.
+ * pages, links, routines, tasks, recipes, recipe rows/imports,
+ * groceryItems, routineCompletions, and cached translations.
  */
 export const remove = mutation({
   args: { familyId: v.id("families") },
@@ -316,6 +317,11 @@ export const remove = mutation({
     await deleteByFamily(ctx, "links", args.familyId, "familyId");
     await deleteByFamily(ctx, "routines", args.familyId, "familyId");
     await deleteByFamily(ctx, "tasks", args.familyId, "familyId");
+    await deleteByFamily(ctx, "recipeIngredients", args.familyId, "familyId");
+    await deleteByFamily(ctx, "recipeSteps", args.familyId, "familyId");
+    await deleteByFamily(ctx, "recipeImportJobs", args.familyId, "familyId");
+    await deleteByFamily(ctx, "recipes", args.familyId, "familyId");
+    await deleteByFamily(ctx, "contentTranslations", args.familyId, "by_locale_status");
     await deleteByFamily(ctx, "groceryItems", args.familyId, "familyId");
     await deleteByFamily(ctx, "routineCompletions", args.familyId, "familyId");
     await ctx.db.delete(args.familyId);
@@ -324,12 +330,12 @@ export const remove = mutation({
 
 /** Delete all rows of `table` belonging to `familyId` in batches. */
 async function deleteByFamily<
-  Table extends "familyMembers" | "pages" | "links" | "routines" | "tasks" | "groceryItems" | "routineCompletions",
+  Table extends "familyMembers" | "pages" | "links" | "routines" | "tasks" | "recipes" | "recipeIngredients" | "recipeSteps" | "recipeImportJobs" | "contentTranslations" | "groceryItems" | "routineCompletions",
 >(
   ctx: MutationCtx,
   table: Table,
   familyId: Id<"families">,
-  indexName: Table extends "familyMembers" ? "family" : "familyId",
+  indexName: Table extends "familyMembers" ? "family" : Table extends "contentTranslations" ? "by_locale_status" : "familyId",
 ) {
   let done = false;
   while (!done) {

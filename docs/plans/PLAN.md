@@ -20,13 +20,14 @@ Each person has **their own login + password** (per-user accounts via `@convex-d
 3. **Tasks** — one-off todos; anyone can add and toggle done/not done; admin/owner title-note editing; creator/admin/owner delete
 4. **Household notes** — wiki pages with title and optional photo; anyone can add, admin-only edits, no delete in V1. Stored internally as `pages.type === "item"` for schema compatibility.
 5. **Rules** — wiki notes (e.g. "don't use kitchen cloth on toilets"); **admin-only add/edit/delete**; pinned rules surface on Today
-6. **Wiki links** — `[[Page Name]]` syntax works everywhere content is edited (a *feature*, not a wiki-app index)
+6. **Wiki links** — `[[Record Name]]` syntax works everywhere content is edited, including recipe ingredients and steps. Notes, rules, and recipes are valid reference targets (a *feature*, not a wiki-app index).
 7. **Shopping** — shared realtime list (its own tab); both users can add; pending items stay until bought; bought items remain checked for the current Singapore day, then leave the active view while remaining in history; creator/admin/owner delete
-8. **i18n by default** — UI strings are locale-keyed. English, Burmese, and Indonesian UI bundles ship today. Typed task content has an operator-gated, on-demand translation pilot; see `docs/translation.md`.
+8. **i18n by default** — all UI strings use `react-i18next` with English, Indonesian, and Burmese locale files. User content uses an operator-gated, on-demand translation cache: authored text stays authoritative, visible supported fields translate into the viewer's profile locale, and failures fall back to source. Tasks are the first merged entity; PER-3 adds recipe title, ingredients, and steps.
 9. **Auth** — per-user accounts, per-user password; truthful "added by"
+10. **Recipes** — both roles can import a public TikTok, Instagram, YouTube, or website URL; Bluetape extracts structured ingredients + steps, preserves the source, and saves the result after review. Recipes have their own mobile tab and stable detail routes. See `docs/plans/2026-07-22-recipe-import-uiux-plan.md`.
 
 ### Explicitly out of V1
-- Auto-translation beyond the gated one-off-task pilot
+- Automatic user-content translation for routines, shopping, notes, and rules; expand only after task and recipe quality is accepted
 - Additional UI/content locales beyond the currently supported set
 - Barcode scanning for items/groceries
 - Audio pronunciation for local-language content
@@ -35,10 +36,10 @@ Each person has **their own login + password** (per-user accounts via `@convex-d
 - Inventory/stock tracking (groceries = shopping list only)
 
 ### V2 candidates
-- Expand typed-content translation to routines, shopping, notes, and rules after language-specific review
+- Controlled user-content translation expansion to routines, shopping, notes, and rules
 - Additional reviewed UI/content locales
 - Bidirectional backlinks / link graph view
-- Recipes with ingredient → grocery-list generation
+- Recipe ingredients → Shopping list generation
 - Item inventory + low-stock alerts
 - Delete/archive flows for items + tasks
 
@@ -50,7 +51,8 @@ Each person has **their own login + password** (per-user accounts via `@convex-d
 - **Backend / DB / realtime / file storage:** Convex
 - **Auth:** `@convex-dev/auth` with the password provider (per-user accounts, scrypt-hashed)
 - **Hosting / CI:** Convex deployment + Cloudflare Pages, auto-deploy on push to `main` via GitHub integration
-- **i18n:** `react-i18next` + `i18next` — UI strings locale-keyed from day one (English UI in V1, additional locale files drop in for V2). Locale routed via `Accept-Language` + a per-account `locale` field, defaulting `en-SG`.
+- **Recipe media processing:** a Dockerized Python worker on Railway in the Indiego Lab workspace; Convex remains the durable job queue and system of record. See `docs/adr/002-external-recipe-media-worker.md`.
+- **i18n:** `react-i18next` + `i18next` with English, Indonesian, and Burmese locale files. Locale resolves from the per-account profile, then browser language, then English fallback. Supported user-content fields use the operator-gated lazy `contentTranslations` cache.
 - **Styling:** Tailwind CSS v4, tokens derived from `DESIGN.md`
 - **Markdown + wiki links:** `markdown-it` with a custom `[[wiki link]]` plugin
 - **Icons:** `@phosphor-icons/react` at `strokeWidth: 1.75`
@@ -87,7 +89,7 @@ Single source of truth: `convex/schema.ts`. All tables use Convex IDs.
 ```
 **Indexes:** `slug` (for lookup), `title` (for link resolution), `by_type` (`type, updatedAt`), `pinned_rules` (`type, pinnedToToday` where type="rule"). Slug uniqueness is enforced in mutations by checking the indexed lookup before insert/update.
 
-**i18n note:** `content` + `localContent` remain the manual page-translation pattern. The on-demand translation pilot applies only to one-off task titles and notes; page-body translation is deferred until Markdown can be segmented and reconstructed safely.
+**i18n note:** `content` + `localContent` remain the manual page-translation pattern. Generated task and recipe translations live in the separate on-demand `contentTranslations` cache; authored fields remain authoritative and are never overwritten. Page-body translation is deferred until Markdown can be segmented and reconstructed safely.
 
 ### `links` — outbound wiki links from a page (for backlinks)
 ```ts
@@ -287,12 +289,10 @@ Today's checklist                  ← label-caps, tertiary
 
 ### 6.3 Page Editor — `/p/:slug/edit` and `/p/new`
 - Title input (label above)
-- Type selector: segmented control (Item / Rule / Recipe / General)
+- The create route fixes the type to Note or Rule from its entry point; recipes use their own structured import/editor flow rather than the generic page editor.
 - Conditional fields based on type:
   - **Note:** Photo with explicit Upload photo and Take photo actions (uses Convex upload URL flow). Local-language name and location are not authored in the V1 form; legacy stored values remain readable.
   - **Rule:** a `pinToToday` toggle ("Show as reminder on Today")
-  - **Recipe:** nothing extra in V1 (it's just markdown)
-  - **General:** nothing extra
 - Markdown editor: a `<textarea>` with a hint banner showing `Use [[Page Name]] to link another page`. Live preview toggle.
 - Link autocomplete: typing `[[` opens a dropdown of existing page titles; selecting inserts `[[Selected Title]]`.
 - Sticky bottom bar: Cancel (ghost) · Save (primary). Save disabled while empty title.
@@ -335,10 +335,10 @@ Today's checklist                  ← label-caps, tertiary
 - Also hosts **Sign out** (a row here — simplest, no settings chrome needed)
 
 ### 6.7 Search — modal command palette (no tab)
-**Scope:** searches **notes, rules, and one-off tasks** only. Does **not** search routines (those are admin-managed on their own tab and users don't need to find them by text). Triggered from the search icon in the top bar.
+**Scope:** searches **notes, rules, recipes, and one-off tasks**. Does **not** search routines (those are admin-managed on their own tab and users don't need to find them by text). Triggered from the search icon in the top bar.
 
-- V1: client-side filter over reactive loaded lists (pages of type item/rule + tasks)
-- Results grouped by kind: Notes / Rules / Tasks
+- V1: client-side filter over reactive loaded lists (pages of type item/rule + recipes + tasks)
+- Results grouped by kind: Notes / Rules / Recipes / Tasks
 - "Create new note: *query*" as the first result → opens the note editor prefilled
 - Fits DESIGN.md rule: white (`surface-floating`) reserved for search bar / command palette / dropdowns / modals
 - Replaces the need for any browse-all index
@@ -351,9 +351,10 @@ Today's checklist                  ← label-caps, tertiary
 - The `users` table is managed by `@convex-dev/auth`; our app-level fields (role, locale, displayName) live in a parallel `userProfiles` table keyed by the auth user ID, so we don't fight the auth provider's schema
 
 ### 6.9 App shell
-- **Bottom tab bar: Today · Routines · Shopping · More** (4 tabs)
-  - `Today` — the daily checklist (routines + tasks due today, check-off)
+- **Bottom tab bar: Tasks · Routines · Recipes · Shopping · More** (5 tabs)
+  - `Tasks` — the daily checklist (routines + tasks due today, check-off)
   - `Routines` — recurring schedule (user view-only, admin manages) + Upcoming tasks section
+  - `Recipes` — structured family recipes plus the paste-link import entry point
   - `Shopping` — shared realtime list (both add/check)
   - `More` — Rules (admin-only) + Notes (anyone-add) catalogs + Sign out
 - **No Search tab** — search opens as a modal from a top-bar icon
@@ -368,17 +369,18 @@ Today's checklist                  ← label-caps, tertiary
 - Locale resolution uses the signed-in account's `userProfiles.locale`, with `en` as fallback.
 - The Language screen lets users select their UI locale.
 
-**B. User content**
+**B. User content — operator-gated lazy translation**
 - Authored entity fields remain the permanent source of truth.
 - `pages.localName` and `pages.localContent` remain manually authored page fields.
-- One-off task titles and notes have an on-demand translation pilot backed by separate `contentTranslations` cache rows; source fields are never replaced.
+- One-off task titles and notes use on-demand translation backed by separate `contentTranslations` cache rows. PER-3 registers recipe titles, ingredient rows, and step rows with the same lifecycle; source fields are never replaced.
 - Translation is enabled per profile only when `userProfiles.autoTranslateEnabled === true`. Missing/false is disabled, new profiles default false, and no public application mutation can change it.
 - The Language screen displays the flag as a disabled switch. An operator changes it directly in the Convex database.
-- A gated viewer sees source immediately; missing translations are generated for that viewer's selected locale only when supported task content is viewed.
+- A gated viewer sees source immediately; missing translations are generated for that viewer's selected locale only when supported content is viewed. Recipe review/edit always uses source, while translated recipe detail offers Show original.
 - OpenRouter is the provider gateway. The default model is `deepseek/deepseek-v4-flash`; credentials remain server-side in `OPENROUTER_API_KEY`.
-- Routines, shopping, Search, notes, rules, and page bodies remain source/manual-only until explicitly expanded and reviewed.
+- Wiki identities, URLs, code, numbers, recipe quantities, and dates are protected across translation. Editing source invalidates cached results through `sourceHash`; translation never blocks save.
+- Routines, shopping, Search, notes, rules, and page bodies remain source/manual-only until explicitly expanded and reviewed. Recipe search continues matching authored source fields.
 
-Operational instructions and exact flag behavior live in `docs/translation.md`. The detailed lifecycle and safety design live in `docs/plans/2026-07-16-lazy-normalized-content-translation.md`.
+Operational instructions and exact flag behavior live in `docs/translation.md`. The detailed lifecycle and safety design live in `docs/plans/2026-07-16-lazy-normalized-content-translation.md`; the recipe extension lives in `docs/plans/2026-07-22-recipe-import-uiux-plan.md`.
 
 ### 6.11 Permissions matrix
 
@@ -393,6 +395,7 @@ Two roles: **admin** and **user** (primary daily role), with the family creator 
 | Notes (wiki pages, photos) | ✓ | ✓ anyone | ✗ admin-only | ✗ never in V1 |
 | Shopping list | ✓ | ✓ both | ✓ both can mark bought | creator/admin/owner |
 | One-off tasks | ✓ | ✓ both | completion: anyone; title/note: admin/owner | creator/admin/owner |
+| Recipes | ✓ | ✓ both import | importer/admin/owner | importer/admin/owner |
 | Notes (creating) | ✓ | ✓ anyone (user can photograph + create) | — | — |
 | Search | ✓ | "create note" result routes to note editor (anyone) | — | — |
 | Sign out | ✓ | — | — | — |
@@ -406,6 +409,18 @@ Two roles: **admin** and **user** (primary daily role), with the family creator 
 
 Enforcement: Convex mutations resolve the authenticated user and their `familyMembers` role, then reject forbidden writes before the DB touch. The UI hides/renders controls per role so users never see dead buttons.
 
+### 6.12 Recipes — `/recipes`, `/recipes/import/:id`, and `/recipes/:id`
+
+- `/recipes` is a first-class family recipe list and the paste-link import entry point.
+- Supported sources: public TikTok, Instagram, and YouTube posts/videos plus normal website URLs.
+- Social imports use caption/description text and a transcript. Website imports prefer Recipe JSON-LD/schema.org and fall back to LLM extraction from readable page content.
+- An accepted URL creates a persistent import before processing. The UI shows real stages, can safely be left, and preserves failures or partial results for retry.
+- Extracted title, ingredients, and ordered steps open in a structured review editor before publish. Source is read-only and always retained.
+- Published recipes use stable `/recipes/:id` URLs, expose the original source near the title, and render ingredients + numbered steps in the page flow without nested cards.
+- Recipes participate in `[[links]]`: they appear in authoring suggestions, resolve to stable `/recipes/:id` routes, and may themselves reference notes, rules, or other recipes from ingredient/step text.
+- Both family roles may import. The importer, a family admin, or the owner may edit/delete.
+- Full interaction, state, responsive, accessibility, and delivery details live in `docs/plans/2026-07-22-recipe-import-uiux-plan.md`.
+
 ---
 
 ## 7. Wiki Link Implementation
@@ -413,18 +428,18 @@ Enforcement: Convex mutations resolve the authenticated user and their `familyMe
 ### Lexer
 A `markdown-it` inline rule registered before `link`:
 - Match `\[\[([^\]|]+)(?:\|([^\]]+))?\]\]`
-- Captures: `target` (canonical `page:<id>` or legacy page title), optional `label` (display text)
+- Captures: `target` (canonical `page:<id>`, canonical `recipe:<id>`, or legacy readable title), optional `label` (display text)
 - Token type: `wiki_link`
 
-Authors still type the readable form `[[Eggs]]`. On save, Convex resolves it within the active family and writes `[[page:<stable-id>|Eggs]]`. A reference that cannot be resolved remains title-based and renders as a broken create-page link.
+Authors still type the readable form `[[Chicken adobo]]`. On save, Convex resolves it within the active family and writes either `[[page:<stable-id>|Label]]` for a note/rule or `[[recipe:<stable-id>|Label]]` for a recipe. A reference that cannot be resolved remains title-based and renders as a broken create-page link.
 
 ### Renderer
 For each `wiki_link` token:
-1. Resolve canonical `page:<id>` directly through `pages:wikiTargetMap`. Legacy title tokens use a case-insensitive title lookup for compatibility.
-2. If the record exists → render its stable canonical URL: `<a href="/{notes|rules}/{id}" class="wikilink">{label || target}</a>`.
+1. Resolve canonical `page:<id>` or `recipe:<id>` through the combined wiki target map. Legacy title tokens use a case-insensitive lookup across notes, rules, and recipes for compatibility; collisions require an explicit author selection rather than an arbitrary winner.
+2. If the record exists → render its stable canonical URL: `<a href="/{notes|rules|recipes}/{id}" class="wikilink">{label || target}</a>`.
 3. If an unresolved legacy title is found → render `<a href="/p/new?title={encoded}" class="wikilink broken">{label || target}</a>` (dashed underline, tertiary color). An unresolved canonical ID renders as broken text and never proposes creating a page named after an ID.
 
-The same inline renderer is used for page bodies and task/routine titles. Task and routine authoring searches only notes and rules; selecting a suggestion inserts readable `[[Page Title]]` text, which is canonicalized by the mutation before storage. No schema migration is required because the fields remain strings; readers support both formats during the compatibility rollout.
+The same inline renderer is used for page bodies, task/routine/shopping text, and recipe ingredients/steps. Authoring searches notes, rules, and recipes; selecting a suggestion inserts readable `[[Record Title]]` text, which is canonicalized by the relevant mutation before storage. Existing string fields remain compatible; readers support legacy title tokens alongside both canonical forms.
 
 ### Link persistence
 On `pages:save` mutation:
@@ -437,9 +452,9 @@ On `pages:save` mutation:
 
 ### Edge cases
 - `[[Target|Display Text]]` → display text shown, target used for resolution
-- Self-links (`[[my own title]]` inside a page) → rendered but excluded from backlinks
+- Self-links (`[[my own title]]` inside a page or recipe) → rendered but excluded from backlinks
 - Case-insensitive title resolution ("Toilet Detergent" matches link to `[[toilet detergent]]`)
-- Renaming a resolved target does not break the link because its stored identity is the page ID
+- Renaming a resolved target does not break the link because its stored identity is the page or recipe ID
 - Empty `[[ ]]` → rendered as literal text
 - Links in code spans / code blocks → not parsed
 
@@ -560,7 +575,16 @@ Each phase ends with something you can open and tap. No phase ships a half-featu
 - Offline tolerance (Convex cache)
 - Rule delete confirmations
 - Export/backup (dump all pages to markdown)
-- Translation expansion only after the gated task pilot passes language review
+- Translation hardening and controlled entity expansion after the task quality gate
+
+### Phase 5 — Recipe import
+- Add Recipes to the five-tab mobile shell and desktop rail
+- Add persistent URL import jobs for social-video and website sources
+- Add the external Docker media worker (`yt-dlp`, FFmpeg/FFprobe, Deno) with authenticated Convex job claiming and stage updates
+- Add structured draft review, recipe detail/edit, source provenance, retry, and delete flows
+- Add recipes to global search and complete i18n/a11y/error-state coverage
+- Extend the merged lazy user-content translation cache to recipe title, ingredient rows, and step rows; review/edit remains source-only
+- **Checkpoint:** either family role can paste a supported public recipe link, review extracted ingredients + steps, save it, and reopen both the Bluetape recipe and its original source.
 
 ---
 
@@ -569,20 +593,20 @@ Each phase ends with something you can open and tap. No phase ships a half-featu
 1. **Auth model → per-user accounts.** Admins and users each have their own password + login. App-level profile fields (locale, timezone, displayName) live in `userProfiles`; family roles live in `familyMembers`. Enables truthful "added by" + permission enforcement. See §6.8.
 2. **Timezone → Asia/Singapore, computed client-side.** Instants stored as Unix timestamps (UTC ms); calendar dates stored as `YYYY-MM-DD` strings; "today" computed on the client in SG, sent to queries. Full model in §4.
 3. **Hosting → Convex + Cloudflare Pages, auto-deploy on push to `main` via GitHub integration.**
-4. **No Pages index / wiki-app surface.** Wiki links are a *feature* (inline `[[...]]` inside tasks, routines, notes, and rules), not the product. Wiki targets remain notes and rules only. Pages are reached by link or by Search, never by browsing an index. No Pages tab.
-5. **Tab bar → 4 tabs: Today · Routines · Shopping · More.** Shopping is its own tab. Search opens as a modal command palette from the top bar, not a tab.
+4. **No Pages index / wiki-app surface.** Wiki links are a *feature* (inline `[[...]]` inside tasks, routines, notes, rules, shopping, and recipes), not the product. Valid targets are notes, rules, and recipes. Records are reached through their product surface, by link, or by Search; there is no generic Pages tab.
+5. **Tab bar → 5 tabs: Tasks · Routines · Recipes · Shopping · More.** Recipes and Shopping are first-class tabs. Search opens as a modal command palette from the top bar, not a tab.
 6. **Today is a flat unified checklist** — recurring routines due today + one-off tasks due today, same checkable-row treatment. No Morning/Afternoon sections. No standalone task index; individual tasks do have `/tasks/:id` detail URLs. Tasks without a due date also surface on Today, future-dated tasks don't (they live in Routines tab's "Upcoming" section).
 7. **Shopping label** = "Shopping" in the UI (table stays `groceryItems`).
 8. **No settings screen in V1.** Sign-out lives in the More tab.
-9. **Search scope → notes + rules + tasks only.** Routines excluded.
+9. **Search scope → notes + rules + recipes + tasks.** Routines excluded.
 10. **Shopping → simple active list model.** Pending items stay until bought. Bought items remain visibly checked for the rest of the current Singapore calendar day, then leave the active list the next day while persisting in history unless explicitly deleted by their creator or an admin/owner. No reset or carry-over mutation is needed; the date-scoped query controls visibility.
 11. **Tasks → admin/owner title-note editing; completion is reversible; deletion is creator/admin/owner-only.** Any family member can toggle `pending ↔ done`; toggling to pending clears `completedAt`. Users cannot edit task content. Due dates remain fixed. A user may delete a task they created; admins/owners may delete any task.
 12. **Rules → admin-only full CRUD** (add + edit + delete). User view-only. **(User-confirmed corrects an earlier note that said "anyone can add.")**
 13. **Notes → anyone can add (user photographs + creates), admin-only edits, no delete in V1.** Notes retain the internal `item` page type to avoid a needless data migration.
 14. **Future-dated tasks → show in "Upcoming" section on Routines tab**, not on Today (until their date arrives).
-15. **i18n by default, with an operator-gated task translation pilot.** UI strings use `react-i18next` with English, Burmese, and Indonesian bundles plus a per-profile language selector. Page-local fields remain manual. One-off task titles/notes use a separate lazy cache only for profiles whose database-managed `autoTranslateEnabled` flag is true; authored source is never replaced. See §6.10 and `docs/translation.md`.
-16. **Stable direct links and resolved wiki identity.** Canonical view routes are `/notes/:id`, `/rules/:id`, `/tasks/:id`, `/routines/:id`, and `/shopping/:id`. Authors type `[[Page Title]]`, but mutations resolve successful references to `[[page:<id>|Display Label]]` before storage. Old `/items/:id`, title-token, and `/p/:slug` routes remain readable for compatibility; all new resolved links navigate by ID.
-17. **Wiki-link autocomplete uses two modes.** Passive suggestions inspect only the active trailing phrase and require a strong title match, so stale matches disappear as typing continues and replacement has an exact character range. Typing `[[` explicitly opens broad fuzzy item/rule search for intentional linking.
+15. **i18n has separate UI and user-content layers.** UI strings ship through `react-i18next` in English, Indonesian, and Burmese. Supported user-content fields use an operator-gated, on-demand `contentTranslations` cache keyed by exact source hash and viewer locale; authored source remains authoritative and visible as the fallback. Tasks are the first merged entity and recipes reuse that lifecycle for title, ingredients, and steps. See §6.10.
+16. **Stable direct links and resolved wiki identity.** Canonical view routes are `/notes/:id`, `/rules/:id`, `/tasks/:id`, `/routines/:id`, `/shopping/:id`, and `/recipes/:id`. Authors type `[[Record Title]]`, but mutations resolve successful references to canonical page or recipe identities before storage. Old `/items/:id`, title-token, and `/p/:slug` routes remain readable for compatibility; all new resolved links navigate by ID.
+17. **Wiki-link autocomplete uses two modes.** Passive suggestions inspect only the active trailing phrase and require a strong title match, so stale matches disappear as typing continues and replacement has an exact character range. Typing `[[` explicitly opens broad fuzzy note/rule/recipe search for intentional linking. Type labels disambiguate title collisions.
 18. **Completed rows remain visible through the day.** A completed task or bought shopping row stays in its current list as a checked row until the Singapore calendar date changes. The next day's date-scoped query removes it from the active list without deleting history.
 19. **Completion controls use optimistic client updates.** Tapping a task or shopping checkbox updates all relevant cached list/detail results immediately; Convex then confirms the mutation or rolls the optimistic state back on failure.
 20. **Task creation is inline.** The Today list ends with an expandable add-task row, matching Shopping. Due date defaults to Today; its popover offers Today, Tomorrow, This weekend, Next week, and a calendar. No Inbox/project selector is shown.
@@ -594,12 +618,17 @@ Each phase ends with something you can open and tap. No phase ships a half-featu
 26. **Shopping detail mirrors task detail.** Bought state uses the same leading check control as tasks. A shopping row can be hard-deleted by the member who added it or by a family admin/owner, with matching UI visibility and server enforcement.
 27. **Versioning and releases use Release Please.** Conventional commits on `main` maintain a release pull request that updates the Node package version and changelog; merging it creates the corresponding Git tag and GitHub release.
 28. **Reopened family invites are navigation, not another join prompt.** If the authenticated person already belongs to the invited family, opening its invite switches that family to active and redirects directly to the app. New members still see the explicit join screen.
+29. **Recipes are structured first-class records, not generic markdown pages.** Import creates a persistent draft, preserves the source, and requires a review of extracted ingredients + ordered steps before publish. Social sources use caption/description + transcript; websites prefer Recipe schema and fall back to LLM extraction.
+30. **Recipe permissions follow authorship.** Both roles can import and view; the importer, a family admin, or the owner can edit/delete. Convex mutations enforce the same rules the UI presents.
+31. **Recipes participate in stable wiki references without becoming generic pages.** Authors type `[[Recipe Title]]`; selection canonicalizes the target to recipe identity and renders `/recipes/:id`. Recipe ingredients and steps also support the same references.
+32. **Recipe media processing runs on Railway in the Indiego Lab workspace.** Convex remains the authenticated durable queue and system of record; a Dockerized Python worker claims jobs and runs `yt-dlp`, FFmpeg/FFprobe, Deno, transcription, and structured extraction. `gallery-dl` is deferred until fixtures prove a need. See ADR 002.
+33. **Recipe text is part of user-content translation.** The reviewed source title, ingredient rows, and step rows remain authoritative. Viewer-localized results use the existing lazy cache and feature gate; review/edit never modifies generated translations.
 
 ## 11. Still Open
 
 - **User-created note quality** — notes a user adds go live immediately without admin review. If low-quality notes become a problem, V2 adds an approval queue. Decide by observation post-launch.
 - **Rules deletion softening** — V1 hard-deletes rules (admin-only). If you want a soft-delete (rule hidden but recoverable) for accidentally-removed rules, tell me before Phase 3.
-- **Translation expansion** — decide whether the gated task pilot is reliable enough to extend to routines, shopping, notes, rules, and structurally segmented page bodies.
+- **Translation expansion beyond tasks and recipes** — routines, shopping, notes, and rules remain source-only until each field mode and real-language quality is accepted.
 
 ---
 
@@ -610,7 +639,7 @@ Each phase ends with something you can open and tap. No phase ships a half-featu
 - [ ] Tap the check-circle → routine or task remains visibly done for today and clears from the active day view tomorrow
 - [ ] Both users can create a note with an optional photo from the phone camera
 - [ ] `[[Links]]` resolve when target exists; show as broken (dashed) when it doesn't
-- [ ] Typing a task or routine title suggests matching items/rules; selecting a result inserts a working inline `[[link]]`
+- [ ] Typing a task or routine title suggests matching notes/rules/recipes; selecting a result inserts a working inline `[[link]]`
 - [ ] Typing a shopping item suggests matching items/rules; selected references render as working inline `[[links]]`
 - [ ] Every note, rule, task, routine, and shopping row has a stable direct URL that survives title changes and can be shared
 - [ ] Weekly + monthly routines appear on the correct day automatically
@@ -623,8 +652,14 @@ Each phase ends with something you can open and tap. No phase ships a half-featu
 - [ ] Rules: admin-only add/edit/delete; user cannot author rules (mutations reject; UI hides controls)
 - [ ] Notes: anyone can create, admin-only edits, no one deletes in V1; catalog is a responsive photo grid
 - [ ] Routines: admin/owner can delete with confirmation; completion history is deleted with the routine
-- [ ] Search (modal) finds notes, rules, and tasks; offers to create a new note
-- [ ] All UI strings routed through `react-i18next` `t()`; no hard-coded English in components; a locale file placeholder exists
+- [ ] Search (modal) finds notes, rules, recipes, and tasks; offers to create a new note
+- [ ] Recipes is a first-class mobile/desktop destination; either role can import a supported public social-video or website URL
+- [ ] Recipe imports persist while processing, survive navigation, and retain recoverable partial/failure states
+- [ ] Imported recipes require review of title, ingredients, and ordered steps before publish and always retain an openable source link
+- [ ] Published recipes have stable detail URLs and appear in global search
+- [ ] Recipes appear in `[[` suggestions, links to them survive renames, and recipe ingredients/steps can link to notes, rules, or recipes
+- [ ] Recipe title, ingredients, and steps use the existing operator-gated lazy user-content translation cache; source appears immediately and remains the only editable text
+- [ ] All UI strings route through `react-i18next` `t()` with matching English, Indonesian, and Burmese keys; no hard-coded English appears in components
 - [ ] All screens meet DESIGN.md tokens, contrast, and the no-nested-containers rule
 - [ ] Passes `prefers-reduced-motion` and tap-target ≥44px checks
 - [ ] Ships on Convex + Cloudflare Pages, auto-deploy on push to `main`

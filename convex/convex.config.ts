@@ -18,5 +18,7 @@ export default defineApp({
     OPENROUTER_API_KEY: v.optional(v.string()),
     /** Optional override; defaults to DeepSeek V4 Flash in the adapter. */
     OPENROUTER_TRANSLATION_MODEL: v.optional(v.string()),
+    /** Rotatable bearer secret used only by the external recipe worker. */
+    RECIPE_WORKER_SECRET: v.optional(v.string()),
   },
 });

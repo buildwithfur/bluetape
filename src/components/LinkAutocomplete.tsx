@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useAllPages } from '@/data/hooks'
-import type { Doc } from '@convex/_generated/dataModel'
+import { useAllTitles } from '@/data/hooks'
+
+type WikiTarget = {
+  id: string
+  title: string
+  type: 'item' | 'rule' | 'recipe'
+}
 
 /** Inline `[[` link autocomplete for the page editor (PLAN.md §6.3).
  * Watches the caret; when it immediately precedes an open `[[` with no
@@ -12,7 +17,7 @@ export function useLinkAutocomplete(
   value: string,
   setValue: (next: string) => void,
 ) {
-  const pages = useAllPages()
+  const pages = useAllTitles()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [anchor, setAnchor] = useState<{ start: number; end: number } | null>(null)
@@ -21,7 +26,7 @@ export function useLinkAutocomplete(
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const all = (pages ?? []) as Doc<'pages'>[]
+    const all = (pages ?? []) as WikiTarget[]
     return (q ? all.filter((p) => p.title.toLowerCase().includes(q)) : all)
       .slice(0, 6)
   }, [pages, query])
@@ -54,11 +59,13 @@ export function useLinkAutocomplete(
     setActive(0)
   }, [value, textareaRef, caret])
 
-  function insert(page: Doc<'pages'>) {
+  function insert(page: WikiTarget) {
     if (!anchor) return
     const before = value.slice(0, anchor.start)
     const after = value.slice(anchor.end)
-    const inserted = `[[${page.title}]]`
+    const inserted = page.type === 'recipe'
+      ? `[[recipe:${page.id}|${page.title}]]`
+      : `[[${page.title}]]`
     const next = before + inserted + after
     setValue(next)
     setOpen(false)

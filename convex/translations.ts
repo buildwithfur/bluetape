@@ -21,7 +21,8 @@ import {
   TRANSLATION_RETRY_MS,
   translationClaimValidator,
   translationFieldRefValidator,
-  type TaskTranslationField,
+  type TranslationFieldRef,
+  type TranslationMode,
 } from "./translation/validators";
 
 const fieldStateValidator = v.union(
@@ -34,9 +35,19 @@ const fieldStateValidator = v.union(
 );
 
 const fieldResultValidator = v.object({
-  entityType: v.literal("task"),
-  entityId: v.id("tasks"),
-  field: v.union(v.literal("title"), v.literal("note")),
+  entityType: v.union(
+    v.literal("task"),
+    v.literal("recipe"),
+    v.literal("recipeIngredient"),
+    v.literal("recipeStep"),
+  ),
+  entityId: v.union(
+    v.id("tasks"),
+    v.id("recipes"),
+    v.id("recipeIngredients"),
+    v.id("recipeSteps"),
+  ),
+  field: v.union(v.literal("title"), v.literal("note"), v.literal("text")),
   state: fieldStateValidator,
   translatedText: v.optional(v.string()),
   retryAfter: v.optional(v.number()),
@@ -66,18 +77,15 @@ const completionValidator = v.union(
   }),
 );
 
-type TranslationRef = {
-  entityType: "task";
-  entityId: Id<"tasks">;
-  field: TaskTranslationField;
-};
+function refKey(ref: TranslationFieldRef): string {
+  return `${ref.entityType}:${ref.entityId}:${ref.field}`;
+}
 
-function assertBoundedUniqueFields(fields: TranslationRef[]): void {
+function assertBoundedUniqueFields(fields: TranslationFieldRef[]): void {
   if (fields.length > MAX_TRANSLATION_FIELDS) {
     throw new Error(`At most ${MAX_TRANSLATION_FIELDS} translation fields are allowed`);
   }
-  const keys = new Set(fields.map((field) => `${field.entityId}:${field.field}`));
-  if (keys.size !== fields.length) {
+  if (new Set(fields.map(refKey)).size !== fields.length) {
     throw new Error("Translation fields must be unique");
   }
 }
@@ -88,37 +96,102 @@ function assertSupportedLocale(locale: string): void {
   }
 }
 
-function sourceFor(task: Doc<"tasks">, field: TaskTranslationField): string {
-  return field === "title" ? task.title : task.note ?? "";
+function refFromTranslation(
+  translation: Doc<"contentTranslations">,
+): TranslationFieldRef | null {
+  if (translation.entityType === "task" &&
+      (translation.field === "title" || translation.field === "note")) {
+    return {
+      entityType: "task",
+      entityId: translation.entityId as Id<"tasks">,
+      field: translation.field,
+    };
+  }
+  if (translation.entityType === "recipe" && translation.field === "title") {
+    return {
+      entityType: "recipe",
+      entityId: translation.entityId as Id<"recipes">,
+      field: "title",
+    };
+  }
+  if (translation.entityType === "recipeIngredient" && translation.field === "text") {
+    return {
+      entityType: "recipeIngredient",
+      entityId: translation.entityId as Id<"recipeIngredients">,
+      field: "text",
+    };
+  }
+  if (translation.entityType === "recipeStep" && translation.field === "text") {
+    return {
+      entityType: "recipeStep",
+      entityId: translation.entityId as Id<"recipeSteps">,
+      field: "text",
+    };
+  }
+  return null;
+}
+
+async function sourceForRef(
+  ctx: QueryCtx | MutationCtx,
+  familyId: Id<"families">,
+  ref: TranslationFieldRef,
+): Promise<{ source: string; mode: TranslationMode }> {
+  switch (ref.entityType) {
+    case "task": {
+      const task = await ctx.db.get(ref.entityId);
+      if (!task || task.familyId !== familyId) {
+        throw new Error("Task not found in current family");
+      }
+      return {
+        source: ref.field === "title" ? task.title : task.note ?? "",
+        mode: ref.field === "title" ? "label" : "instruction",
+      };
+    }
+    case "recipe": {
+      const recipe = await ctx.db.get(ref.entityId);
+      if (!recipe || recipe.familyId !== familyId) {
+        throw new Error("Recipe not found in current family");
+      }
+      return { source: recipe.title, mode: "label" };
+    }
+    case "recipeIngredient": {
+      const ingredient = await ctx.db.get(ref.entityId);
+      if (!ingredient || ingredient.familyId !== familyId) {
+        throw new Error("Recipe ingredient not found in current family");
+      }
+      return { source: ingredient.text, mode: "ingredient" };
+    }
+    case "recipeStep": {
+      const step = await ctx.db.get(ref.entityId);
+      if (!step || step.familyId !== familyId) {
+        throw new Error("Recipe step not found in current family");
+      }
+      return { source: step.text, mode: "instruction" };
+    }
+  }
 }
 
 async function findTranslation(
   ctx: QueryCtx | MutationCtx,
   familyId: Id<"families">,
-  ref: TranslationRef,
+  ref: TranslationFieldRef,
   targetLocale: string,
 ) {
   return ctx.db
     .query("contentTranslations")
-    .withIndex(
-      "by_entity_field_locale",
-      (q) =>
-        q
-          .eq("familyId", familyId)
-          .eq("entityType", "task")
-          .eq("entityId", ref.entityId)
-          .eq("field", ref.field)
-          .eq("targetLocale", targetLocale),
-    )
+    .withIndex("by_entity_field_locale", (q) =>
+      q
+        .eq("familyId", familyId)
+        .eq("entityType", ref.entityType)
+        .eq("entityId", ref.entityId)
+        .eq("field", ref.field)
+        .eq("targetLocale", targetLocale))
     .unique();
 }
 
 export const getForFields = query({
   args: { fields: v.array(translationFieldRefValidator) },
-  returns: v.object({
-    enabled: v.boolean(),
-    results: v.array(fieldResultValidator),
-  }),
+  returns: v.object({ enabled: v.boolean(), results: v.array(fieldResultValidator) }),
   handler: async (ctx, args) => {
     assertBoundedUniqueFields(args.fields);
     const { profile } = await requireAuthenticatedUser(ctx);
@@ -130,36 +203,19 @@ export const getForFields = query({
 
     const results = [];
     for (const ref of args.fields) {
-      const task = await ctx.db.get(ref.entityId);
-      if (!task || task.familyId !== profile.currentFamilyId) {
-        throw new Error("Task not found in current family");
-      }
-      const source = sourceFor(task, ref.field);
+      const { source } = await sourceForRef(ctx, profile.currentFamilyId, ref);
       if (!source.trim()) {
         results.push({ ...ref, state: "empty" as const });
         continue;
       }
       const sourceHash = await sha256Hex(source);
-      const translation = await findTranslation(
-        ctx,
-        profile.currentFamilyId,
-        ref,
-        profile.locale,
-      );
+      const translation = await findTranslation(ctx, profile.currentFamilyId, ref, profile.locale);
       if (!translation || translation.sourceHash !== sourceHash) {
         results.push({ ...ref, state: "missing" as const });
       } else if (translation.status === "ready") {
-        results.push({
-          ...ref,
-          state: "ready" as const,
-          translatedText: translation.translatedText,
-        });
+        results.push({ ...ref, state: "ready" as const, translatedText: translation.translatedText });
       } else if (translation.status === "failed") {
-        results.push({
-          ...ref,
-          state: "failed" as const,
-          retryAfter: translation.retryAfter,
-        });
+        results.push({ ...ref, state: "failed" as const, retryAfter: translation.retryAfter });
       } else {
         results.push({ ...ref, state: translation.status });
       }
@@ -174,48 +230,28 @@ export const ensureForFields = mutation({
   handler: async (ctx, args) => {
     assertBoundedUniqueFields(args.fields);
     const { profile } = await requireAuthenticatedUser(ctx);
-    if (profile.autoTranslateEnabled !== true || !profile.currentFamilyId) {
-      return null;
-    }
+    if (profile.autoTranslateEnabled !== true || !profile.currentFamilyId) return null;
     assertSupportedLocale(profile.locale);
     await requireFamilyMember(ctx, profile.currentFamilyId);
 
     const now = Date.now();
-    const claims: Array<{
-      translationId: Id<"contentTranslations">;
-      sourceHash: string;
-      generation: number;
-    }> = [];
-
+    const claims: Array<{ translationId: Id<"contentTranslations">; sourceHash: string; generation: number }> = [];
     for (const ref of args.fields) {
-      const task = await ctx.db.get(ref.entityId);
-      if (!task || task.familyId !== profile.currentFamilyId) {
-        throw new Error("Task not found in current family");
-      }
-      const source = sourceFor(task, ref.field);
+      const { source } = await sourceForRef(ctx, profile.currentFamilyId, ref);
       if (!source.trim()) continue;
-
       const sourceHash = await sha256Hex(source);
-      const existing = await findTranslation(
-        ctx,
-        profile.currentFamilyId,
-        ref,
-        profile.locale,
-      );
-      if (
-        existing?.sourceHash === sourceHash &&
-        (existing.status === "ready" ||
-          existing.status === "source_is_target" ||
-          (existing.status === "pending" && existing.leaseExpiresAt > now) ||
-          (existing.status === "failed" && existing.retryAfter > now))
-      ) {
+      const existing = await findTranslation(ctx, profile.currentFamilyId, ref, profile.locale);
+      if (existing?.sourceHash === sourceHash &&
+          (existing.status === "ready" || existing.status === "source_is_target" ||
+           (existing.status === "pending" && existing.leaseExpiresAt > now) ||
+           (existing.status === "failed" && existing.retryAfter > now))) {
         continue;
       }
 
       const generation = (existing?.generation ?? 0) + 1;
       const pending = {
         familyId: profile.currentFamilyId,
-        entityType: "task" as const,
+        entityType: ref.entityType,
         entityId: ref.entityId,
         field: ref.field,
         targetLocale: profile.locale,
@@ -232,9 +268,7 @@ export const ensureForFields = mutation({
     }
 
     if (claims.length > 0) {
-      await ctx.scheduler.runAfter(0, internal.translationActions.processClaims, {
-        claims,
-      });
+      await ctx.scheduler.runAfter(0, internal.translationActions.processClaims, { claims });
     }
     return null;
   },
@@ -242,33 +276,29 @@ export const ensureForFields = mutation({
 
 export const loadClaims = internalQuery({
   args: { claims: v.array(translationClaimValidator) },
-  returns: v.array(
-    v.object({
-      claim: translationClaimValidator,
-      source: v.string(),
-      targetLocale: v.string(),
-    }),
-  ),
+  returns: v.array(v.object({
+    claim: translationClaimValidator,
+    source: v.string(),
+    targetLocale: v.string(),
+    mode: v.union(v.literal("label"), v.literal("instruction"), v.literal("ingredient")),
+  })),
   handler: async (ctx, args) => {
-    if (args.claims.length > MAX_TRANSLATION_FIELDS) {
-      throw new Error("Too many translation claims");
-    }
+    if (args.claims.length > MAX_TRANSLATION_FIELDS) throw new Error("Too many translation claims");
     const loaded = [];
     for (const claim of args.claims) {
       const translation = await ctx.db.get(claim.translationId);
-      if (
-        !translation ||
-        translation.status !== "pending" ||
-        translation.sourceHash !== claim.sourceHash ||
-        translation.generation !== claim.generation
-      ) {
+      if (!translation || translation.status !== "pending" ||
+          translation.sourceHash !== claim.sourceHash || translation.generation !== claim.generation) continue;
+      const ref = refFromTranslation(translation);
+      if (!ref) continue;
+      let current;
+      try {
+        current = await sourceForRef(ctx, translation.familyId, ref);
+      } catch {
         continue;
       }
-      const task = await ctx.db.get(translation.entityId);
-      if (!task || task.familyId !== translation.familyId) continue;
-      const source = sourceFor(task, translation.field);
-      if ((await sha256Hex(source)) !== claim.sourceHash) continue;
-      loaded.push({ claim, source, targetLocale: translation.targetLocale });
+      if ((await sha256Hex(current.source)) !== claim.sourceHash) continue;
+      loaded.push({ claim, source: current.source, targetLocale: translation.targetLocale, mode: current.mode });
     }
     return loaded;
   },
@@ -278,33 +308,26 @@ export const completeClaims = internalMutation({
   args: { completions: v.array(completionValidator) },
   returns: v.null(),
   handler: async (ctx, args) => {
-    if (args.completions.length > MAX_TRANSLATION_FIELDS) {
-      throw new Error("Too many translation completions");
-    }
+    if (args.completions.length > MAX_TRANSLATION_FIELDS) throw new Error("Too many translation completions");
     const now = Date.now();
     for (const completion of args.completions) {
       const { claim } = completion;
       const translation = await ctx.db.get(claim.translationId);
-      if (
-        !translation ||
-        translation.status !== "pending" ||
-        translation.sourceHash !== claim.sourceHash ||
-        translation.generation !== claim.generation
-      ) {
+      if (!translation || translation.status !== "pending" ||
+          translation.sourceHash !== claim.sourceHash || translation.generation !== claim.generation) continue;
+      const ref = refFromTranslation(translation);
+      if (!ref) continue;
+      let current;
+      try {
+        current = await sourceForRef(ctx, translation.familyId, ref);
+      } catch {
         continue;
       }
-      const task = await ctx.db.get(translation.entityId);
-      if (
-        !task ||
-        task.familyId !== translation.familyId ||
-        (await sha256Hex(sourceFor(task, translation.field))) !== claim.sourceHash
-      ) {
-        continue;
-      }
+      if ((await sha256Hex(current.source)) !== claim.sourceHash) continue;
 
       const common = {
         familyId: translation.familyId,
-        entityType: "task" as const,
+        entityType: translation.entityType,
         entityId: translation.entityId,
         field: translation.field,
         targetLocale: translation.targetLocale,

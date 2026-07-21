@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import {
   ListChecks,
   CalendarDots,
+  CookingPot,
   ShoppingCart,
   DotsThreeOutline,
   MagnifyingGlass,
@@ -21,11 +22,12 @@ import { todayLabel } from '@/lib/date'
 import { useCurrentRole, useNavigationWarmup } from '@/data/hooks'
 import { useAuthActions } from '@convex-dev/auth/react'
 
-/** Per PLAN.md §6.9: 4-tab bottom bar on mobile (Today · Routines · Shopping · More),
+/** Per PLAN.md §6.9: 5-tab bottom bar on mobile (Tasks · Routines · Recipes · Shopping · More),
  * left rail on desktop (≥768px). Search opens as a modal from the top bar — no tab. */
 const TABS = [
   { to: '/', icon: ListChecks, key: 'nav.today', exact: true },
   { to: '/routines', icon: CalendarDots, key: 'nav.routines', exact: false },
+  { to: '/recipes', icon: CookingPot, key: 'nav.recipes', exact: false },
   { to: '/shopping', icon: ShoppingCart, key: 'nav.shopping', exact: false },
   { to: '/more', icon: DotsThreeOutline, key: 'nav.more', exact: false },
 ] as const
@@ -33,6 +35,7 @@ const TABS = [
 const DESKTOP_TABS = [
   { to: '/', icon: ListChecks, key: 'nav.today', exact: true },
   { to: '/routines', icon: CalendarDots, key: 'nav.routines', exact: false },
+  { to: '/recipes', icon: CookingPot, key: 'nav.recipes', exact: false },
   { to: '/shopping', icon: ShoppingCart, key: 'nav.shopping', exact: false },
   { to: '/more/rules', icon: Scroll, key: 'more.rules', exact: false },
   { to: '/more/notes', icon: NoteBlank, key: 'more.items', exact: false },
@@ -59,7 +62,7 @@ export function TabBar() {
       className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-surface border-t border-border-subtle"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <ul className="grid grid-cols-4 h-14">
+      <ul className="grid grid-cols-5 h-14">
         {TABS.map(({ to, icon: Icon, key, exact }) => {
           const active = isActive(pathname, to, exact)
           return (

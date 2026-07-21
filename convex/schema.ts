@@ -115,6 +115,102 @@ export default defineSchema({
     .index("status_completedAt", ["familyId", "status", "completedAt"]),
 
   /**
+   * recipes — structured family recipes. Imports create a draft immediately;
+   * only published rows appear in the family recipe catalog.
+   */
+  recipes: defineTable({
+    familyId: v.id("families"),
+    title: v.string(),
+    status: v.union(v.literal("draft"), v.literal("published")),
+    sourceUrl: v.string(),
+    normalizedSourceUrl: v.string(),
+    sourceType: v.union(
+      v.literal("tiktok"),
+      v.literal("instagram"),
+      v.literal("youtube"),
+      v.literal("website"),
+    ),
+    sourceDomain: v.string(),
+    sourceName: v.optional(v.string()),
+    sourceImageUrl: v.optional(v.string()),
+    searchText: v.string(),
+    ingredientCount: v.number(),
+    stepCount: v.number(),
+    createdBy: v.id("users"),
+    updatedBy: v.id("users"),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    reviewedAt: v.optional(v.number()),
+    manuallyEditedAt: v.optional(v.number()),
+  })
+    .index("familyId", ["familyId"])
+    .index("by_family_and_status_and_updated_at", ["familyId", "status", "updatedAt"])
+    .index("by_family_and_normalized_source_url", ["familyId", "normalizedSourceUrl"]),
+
+  recipeIngredients: defineTable({
+    familyId: v.id("families"),
+    recipeId: v.id("recipes"),
+    text: v.string(),
+    sortOrder: v.number(),
+  })
+    .index("familyId", ["familyId"])
+    .index("by_recipe_and_sort_order", ["recipeId", "sortOrder"]),
+
+  recipeSteps: defineTable({
+    familyId: v.id("families"),
+    recipeId: v.id("recipes"),
+    text: v.string(),
+    sortOrder: v.number(),
+  })
+    .index("familyId", ["familyId"])
+    .index("by_recipe_and_sort_order", ["recipeId", "sortOrder"]),
+
+  /** Operational state for the external recipe extraction worker. */
+  recipeImportJobs: defineTable({
+    familyId: v.id("families"),
+    recipeId: v.id("recipes"),
+    sourceUrl: v.string(),
+    normalizedSourceUrl: v.string(),
+    sourceType: v.union(
+      v.literal("tiktok"),
+      v.literal("instagram"),
+      v.literal("youtube"),
+      v.literal("website"),
+    ),
+    sourceDomain: v.string(),
+    createdBy: v.id("users"),
+    status: v.union(
+      v.literal("queued"),
+      v.literal("processing"),
+      v.literal("needs_review"),
+      v.literal("failed"),
+      v.literal("published"),
+    ),
+    stage: v.union(
+      v.literal("queued"),
+      v.literal("reading_source"),
+      v.literal("reading_caption"),
+      v.literal("transcribing"),
+      v.literal("extracting_recipe"),
+      v.literal("needs_review"),
+      v.literal("failed"),
+      v.literal("published"),
+    ),
+    attemptCount: v.number(),
+    leaseToken: v.optional(v.string()),
+    leaseExpiresAt: v.optional(v.number()),
+    lastErrorCode: v.optional(v.string()),
+    lastErrorMessage: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("familyId", ["familyId"])
+    .index("by_family_and_created_at", ["familyId", "createdAt"])
+    .index("by_status_and_created_at", ["status", "createdAt"])
+    .index("by_status_and_lease_expires_at", ["status", "leaseExpiresAt"])
+    .index("by_family_and_normalized_source_url", ["familyId", "normalizedSourceUrl"]),
+
+  /**
    * groceryItems — shared shopping list. Creator/admin/owner can delete.
    */
   groceryItems: defineTable({
@@ -160,17 +256,14 @@ export default defineSchema({
   })
     .index("userId", ["userId"]),
 
-  /**
-   * On-demand task translation cache. Authored task fields remain the source
-   * of truth; these rows are disposable operational state keyed by locale.
-   */
+  /** On-demand user-content translation cache. Authored fields stay source. */
   contentTranslations: defineTable(
     v.union(
       v.object({
         familyId: v.id("families"),
-        entityType: v.literal("task"),
-        entityId: v.id("tasks"),
-        field: v.union(v.literal("title"), v.literal("note")),
+        entityType: v.union(v.literal("task"), v.literal("recipe"), v.literal("recipeIngredient"), v.literal("recipeStep")),
+        entityId: v.union(v.id("tasks"), v.id("recipes"), v.id("recipeIngredients"), v.id("recipeSteps")),
+        field: v.union(v.literal("title"), v.literal("note"), v.literal("text")),
         targetLocale: v.string(),
         sourceHash: v.string(),
         generation: v.number(),
@@ -180,9 +273,9 @@ export default defineSchema({
       }),
       v.object({
         familyId: v.id("families"),
-        entityType: v.literal("task"),
-        entityId: v.id("tasks"),
-        field: v.union(v.literal("title"), v.literal("note")),
+        entityType: v.union(v.literal("task"), v.literal("recipe"), v.literal("recipeIngredient"), v.literal("recipeStep")),
+        entityId: v.union(v.id("tasks"), v.id("recipes"), v.id("recipeIngredients"), v.id("recipeSteps")),
+        field: v.union(v.literal("title"), v.literal("note"), v.literal("text")),
         targetLocale: v.string(),
         sourceHash: v.string(),
         generation: v.number(),
@@ -196,9 +289,9 @@ export default defineSchema({
       }),
       v.object({
         familyId: v.id("families"),
-        entityType: v.literal("task"),
-        entityId: v.id("tasks"),
-        field: v.union(v.literal("title"), v.literal("note")),
+        entityType: v.union(v.literal("task"), v.literal("recipe"), v.literal("recipeIngredient"), v.literal("recipeStep")),
+        entityId: v.union(v.id("tasks"), v.id("recipes"), v.id("recipeIngredients"), v.id("recipeSteps")),
+        field: v.union(v.literal("title"), v.literal("note"), v.literal("text")),
         targetLocale: v.string(),
         sourceHash: v.string(),
         generation: v.number(),
@@ -210,9 +303,9 @@ export default defineSchema({
       }),
       v.object({
         familyId: v.id("families"),
-        entityType: v.literal("task"),
-        entityId: v.id("tasks"),
-        field: v.union(v.literal("title"), v.literal("note")),
+        entityType: v.union(v.literal("task"), v.literal("recipe"), v.literal("recipeIngredient"), v.literal("recipeStep")),
+        entityId: v.union(v.id("tasks"), v.id("recipes"), v.id("recipeIngredients"), v.id("recipeSteps")),
+        field: v.union(v.literal("title"), v.literal("note"), v.literal("text")),
         targetLocale: v.string(),
         sourceHash: v.string(),
         generation: v.number(),

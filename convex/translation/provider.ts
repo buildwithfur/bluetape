@@ -8,7 +8,7 @@ export type TranslationProviderInput = {
   id: string;
   text: string;
   targetLocale: string;
-  mode: "instruction";
+  mode: "label" | "instruction" | "ingredient";
 };
 
 export type TranslationProviderResult = {
@@ -171,6 +171,7 @@ export async function translateBatch(
               "Resolve fillers, discourse particles, omitted words, local idioms, and nonstandard grammar from context instead of copying them literally. " +
               "Treat each item's targetLanguage as authoritative; specifically, locale my means Burmese/Myanmar (မြန်မာဘာသာ), never Malay. " +
               "When the intended speech act is a command, normalizedSource must be a direct imperative rather than a description of the listener's habits. " +
+              "Honor each item's mode: label means a short title, ingredient means concise recipe ingredient wording with quantities and units unchanged, and instruction means a direct actionable sentence. " +
               "Preserve every action, object, negation, name, quantity, date, sequence, urgency, URL, code span, and __BT_*__ placeholder. " +
               "Do not add advice or make an instruction stricter or weaker. " +
               "Return valid JSON only as {\"results\":[{\"id\":string,\"detectedSourceLocale\":string,\"normalizedSource\":string,\"translatedText\":string,\"sourceIsTarget\":boolean}]}. " +

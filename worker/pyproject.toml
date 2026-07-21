@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bluetape-recipe-worker"
+version = "0.1.0"
+description = "External media and website recipe extraction worker for Bluetape"
+requires-python = ">=3.12"
+dependencies = [
+  "beautifulsoup4>=4.13,<5",
+  "faster-whisper>=1.2,<2",
+  "httpx>=0.28,<1",
+  "pydantic>=2.11,<3",
+  "yt-dlp[default]>=2025.1.1,<2027",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.4,<9", "ruff>=0.12,<1"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["bluetape_recipe_worker"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"

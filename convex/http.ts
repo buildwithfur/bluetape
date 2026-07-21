@@ -1,5 +1,5 @@
 import { httpRouter } from "convex/server";
-import { httpAction } from "./_generated/server";
+import { env, httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { auth } from "./auth";
 import type { Id } from "./_generated/dataModel";
@@ -49,6 +49,77 @@ http.route({
     }
   }),
 });
+
+// ─── Recipe worker routes ─────────────────────────────────────────────
+
+function constantTimeEqual(left: string, right: string): boolean {
+  const max = Math.max(left.length, right.length);
+  let difference = left.length ^ right.length;
+  for (let index = 0; index < max; index++) {
+    difference |= (left.charCodeAt(index) || 0) ^ (right.charCodeAt(index) || 0);
+  }
+  return difference === 0;
+}
+
+function authenticateRecipeWorker(req: Request): void {
+  const configured = env.RECIPE_WORKER_SECRET;
+  const header = req.headers.get("Authorization");
+  const provided = header?.startsWith("Bearer ") ? header.slice(7) : "";
+  if (!configured || !provided || !constantTimeEqual(configured, provided)) {
+    throw Object.assign(new Error("Invalid recipe worker credentials"), { status: 401 });
+  }
+}
+
+function recipeWorkerRoute(
+  path: string,
+  handler: (
+    ctx: Parameters<Parameters<typeof httpAction>[0]>[0],
+    body: Record<string, any>,
+  ) => Promise<unknown>,
+) {
+  http.route({
+    path,
+    method: "POST",
+    handler: httpAction(async (ctx, req) => {
+      try {
+        authenticateRecipeWorker(req);
+        const result = await handler(ctx, await parseBody(req));
+        return jsonResponse(result);
+      } catch (error: any) {
+        return jsonResponse({ error: error.message || "Internal error" }, error.status || 500);
+      }
+    }),
+  });
+}
+
+recipeWorkerRoute("/recipe-worker/claim", async (ctx, body) =>
+  ctx.runMutation(internal.recipes.claimNext, { workerId: String(body.workerId || "worker") }));
+
+recipeWorkerRoute("/recipe-worker/stage", async (ctx, body) =>
+  ctx.runMutation(internal.recipes.updateWorkerStage, {
+    jobId: body.jobId,
+    leaseToken: body.leaseToken,
+    stage: body.stage,
+  }));
+
+recipeWorkerRoute("/recipe-worker/complete", async (ctx, body) =>
+  ctx.runMutation(internal.recipes.completeWorkerDraft, {
+    jobId: body.jobId,
+    leaseToken: body.leaseToken,
+    title: body.title,
+    ingredients: body.ingredients,
+    steps: body.steps,
+    sourceName: body.sourceName,
+    sourceImageUrl: body.sourceImageUrl,
+  }));
+
+recipeWorkerRoute("/recipe-worker/fail", async (ctx, body) =>
+  ctx.runMutation(internal.recipes.failWorkerJob, {
+    jobId: body.jobId,
+    leaseToken: body.leaseToken,
+    errorCode: body.errorCode,
+    message: body.message,
+  }));
 
 http.route({
   pathPrefix: "/api/",

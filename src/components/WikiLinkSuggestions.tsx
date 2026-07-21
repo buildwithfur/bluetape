@@ -1,8 +1,13 @@
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { LinkSimple } from '@phosphor-icons/react'
-import { useAllPages } from '@/data/hooks'
-import type { Doc } from '@convex/_generated/dataModel'
+import { useAllTitles } from '@/data/hooks'
+
+type WikiTarget = {
+  id: string
+  title: string
+  type: 'item' | 'rule' | 'recipe'
+}
 
 function normalizedWords(value: string): string[] {
   return value
@@ -30,7 +35,7 @@ function editDistance(left: string, right: string): number {
   return previous[right.length]
 }
 
-function suggestionScore(value: string, page: Doc<'pages'>): number {
+function suggestionScore(value: string, page: WikiTarget): number {
   const plainValue = value.toLowerCase().replace(/\[\[[^\]]+\]\]/g, ' ')
   const title = page.title.toLowerCase()
   if (plainValue.includes(title)) return 100 + title.length
@@ -88,7 +93,7 @@ function unlinkedTokens(value: string): TextToken[] {
  */
 function passiveMatch(
   value: string,
-  page: Doc<'pages'>,
+  page: WikiTarget,
 ): (MatchRange & { score: number }) | null {
   const tokens = unlinkedTokens(value)
   const lastToken = tokens.at(-1)
@@ -134,17 +139,20 @@ function passiveMatch(
   return null
 }
 
-function insertWikiLink(value: string, title: string, range: MatchRange | null): string {
+function insertWikiLink(value: string, target: WikiTarget, range: MatchRange | null): string {
+  const token = target.type === 'recipe'
+    ? `[[recipe:${target.id}|${target.title}]]`
+    : `[[${target.title}]]`
   const lastOpen = value.lastIndexOf('[[')
   const lastClose = value.lastIndexOf(']]')
   if (lastOpen > lastClose) {
-    return `${value.slice(0, lastOpen)}[[${title}]]`
+    return `${value.slice(0, lastOpen)}${token}`
   }
   if (range) {
-    return `${value.slice(0, range.start)}[[${title}]]${value.slice(range.end)}`
+    return `${value.slice(0, range.start)}${token}${value.slice(range.end)}`
   }
   const spacer = value.length > 0 && !value.endsWith(' ') ? ' ' : ''
-  return `${value}${spacer}[[${title}]]`
+  return `${value}${spacer}${token}`
 }
 
 /** Suggest existing item/rule records while wiki-capable text is authored. */
@@ -156,12 +164,12 @@ export function WikiLinkSuggestions({
   onChange: (value: string) => void
 }) {
   const { t } = useTranslation()
-  const pages = useAllPages()
+  const targets = useAllTitles()
   const matches = useMemo(() => {
-    if (!pages) return []
+    if (!targets) return []
     const explicitQuery = openWikiQuery(value)
     const alreadyLinked = value.toLowerCase()
-    return pages
+    return targets
       .map((page) => {
         if (explicitQuery !== null) {
           return {
@@ -183,7 +191,7 @@ export function WikiLinkSuggestions({
       )
       .sort((a, b) => b.score - a.score || a.page.title.localeCompare(b.page.title))
       .slice(0, 5)
-  }, [pages, value])
+  }, [targets, value])
 
   if (matches.length === 0) return null
 
@@ -197,10 +205,10 @@ export function WikiLinkSuggestions({
       </div>
       {matches.map(({ page, range }) => (
         <button
-          key={page._id}
+          key={`${page.type}:${page.id}`}
           type="button"
           onPointerDown={(event) => event.preventDefault()}
-          onClick={() => onChange(insertWikiLink(value, page.title, range))}
+          onClick={() => onChange(insertWikiLink(value, page, range))}
           className="flex min-h-11 w-full items-center gap-3 border-b border-border-subtle px-3 py-2 text-left last:border-b-0 hover:bg-surface-hover active:bg-surface-active"
         >
           <LinkSimple size={17} className="shrink-0 text-ink-700" aria-hidden="true" />

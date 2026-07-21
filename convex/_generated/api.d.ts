@@ -20,6 +20,7 @@ import type * as http from "../http.js";
 import type * as lib_sha256 from "../lib/sha256.js";
 import type * as pages from "../pages.js";
 import type * as permissions from "../permissions.js";
+import type * as recipes from "../recipes.js";
 import type * as routineCompletions from "../routineCompletions.js";
 import type * as routines from "../routines.js";
 import type * as secrets from "../secrets.js";
@@ -53,6 +54,7 @@ declare const fullApi: ApiFromModules<{
   "lib/sha256": typeof lib_sha256;
   pages: typeof pages;
   permissions: typeof permissions;
+  recipes: typeof recipes;
   routineCompletions: typeof routineCompletions;
   routines: typeof routines;
   secrets: typeof secrets;

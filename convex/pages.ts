@@ -120,10 +120,17 @@ export const wikiTargetMap = query({
       .query("pages")
       .withIndex("slug", (q) => q.eq("familyId", args.familyId))
       .take(500);
-    const map: Record<
-      string,
-      { id: Id<"pages">; type: "item" | "rule"; slug: string; title: string }
-    > = {};
+    const recipes = await ctx.db
+      .query("recipes")
+      .withIndex("by_family_and_status_and_updated_at", (q) =>
+        q.eq("familyId", args.familyId).eq("status", "published"))
+      .take(100);
+    const map: Record<string, {
+      id: Id<"pages"> | Id<"recipes">;
+      type: "item" | "rule" | "recipe";
+      slug?: string;
+      title: string;
+    }> = {};
     for (const page of pages) {
       const target = {
         id: page._id,
@@ -133,6 +140,16 @@ export const wikiTargetMap = query({
       };
       map[page.title.toLowerCase()] = target;
       map[`page:${page._id}`] = target;
+    }
+    for (const recipe of recipes) {
+      const target = {
+        id: recipe._id,
+        type: "recipe" as const,
+        title: recipe.title,
+      };
+      const titleKey = recipe.title.toLowerCase();
+      if (!map[titleKey]) map[titleKey] = target;
+      map[`recipe:${recipe._id}`] = target;
     }
     return map;
   },
@@ -146,8 +163,16 @@ export const allTitles = query({
     const pages = await ctx.db
       .query("pages")
       .withIndex("slug", (q) => q.eq("familyId", args.familyId))
-      .collect();
-    return pages.map((p) => ({ title: p.title, slug: p.slug, type: p.type }));
+      .take(500);
+    const recipes = await ctx.db
+      .query("recipes")
+      .withIndex("by_family_and_status_and_updated_at", (q) =>
+        q.eq("familyId", args.familyId).eq("status", "published"))
+      .take(100);
+    return [
+      ...pages.map((p) => ({ id: p._id, title: p.title, slug: p.slug, type: p.type })),
+      ...recipes.map((recipe) => ({ id: recipe._id, title: recipe.title, type: "recipe" as const })),
+    ];
   },
 });
 

@@ -3,6 +3,11 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 
 const WIKI_LINK_RE = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
 const PAGE_ID_PREFIX = "page:";
+const RECIPE_ID_PREFIX = "recipe:";
+
+type WikiTarget =
+  | { kind: "page"; record: Doc<"pages"> }
+  | { kind: "recipe"; record: Doc<"recipes"> };
 
 export type WikiReference = {
   target: string;
@@ -56,6 +61,50 @@ export async function findWikiPage(
   ) ?? null;
 }
 
+async function findWikiRecipe(
+  ctx: MutationCtx | QueryCtx,
+  familyId: Id<"families">,
+  target: string,
+): Promise<Doc<"recipes"> | null> {
+  const trimmed = target.trim();
+  if (trimmed.toLowerCase().startsWith(RECIPE_ID_PREFIX)) {
+    const recipeId = ctx.db.normalizeId("recipes", trimmed.slice(RECIPE_ID_PREFIX.length));
+    if (!recipeId) return null;
+    const recipe = await ctx.db.get(recipeId);
+    return recipe?.familyId === familyId && recipe.status === "published" ? recipe : null;
+  }
+  const recipes = await ctx.db
+    .query("recipes")
+    .withIndex("by_family_and_status_and_updated_at", (q) =>
+      q.eq("familyId", familyId).eq("status", "published"))
+    .take(100);
+  return recipes.find((recipe) => recipe.title.toLowerCase() === trimmed.toLowerCase()) ?? null;
+}
+
+async function findWikiTarget(
+  ctx: MutationCtx | QueryCtx,
+  familyId: Id<"families">,
+  target: string,
+): Promise<WikiTarget | null> {
+  const lower = target.trim().toLowerCase();
+  if (lower.startsWith(PAGE_ID_PREFIX)) {
+    const page = await findWikiPage(ctx, familyId, target);
+    return page ? { kind: "page", record: page } : null;
+  }
+  if (lower.startsWith(RECIPE_ID_PREFIX)) {
+    const recipe = await findWikiRecipe(ctx, familyId, target);
+    return recipe ? { kind: "recipe", record: recipe } : null;
+  }
+  const [page, recipe] = await Promise.all([
+    findWikiPage(ctx, familyId, target),
+    findWikiRecipe(ctx, familyId, target),
+  ]);
+  if (page && recipe) return null;
+  if (page) return { kind: "page", record: page };
+  if (recipe) return { kind: "recipe", record: recipe };
+  return null;
+}
+
 /**
  * Resolve human-authored `[[Page Title]]` tokens at write time.
  *
@@ -70,17 +119,19 @@ export async function canonicalizeWikiReferences(
   const references = parseWikiReferences(content);
   if (references.length === 0) return content;
 
-  const resolved = new Map<string, Doc<"pages">>();
+  const resolved = new Map<string, WikiTarget>();
   for (const reference of references) {
-    const page = await findWikiPage(ctx, familyId, reference.target);
-    if (page) resolved.set(reference.target.toLowerCase(), page);
+    const target = await findWikiTarget(ctx, familyId, reference.target);
+    if (target) resolved.set(reference.target.toLowerCase(), target);
   }
 
   return content.replace(WIKI_LINK_RE, (original, rawTarget, rawLabel) => {
     const target = String(rawTarget).trim();
-    const page = resolved.get(target.toLowerCase());
-    if (!page) return original;
-    const label = String(rawLabel || page.title).trim() || page.title;
-    return `[[${PAGE_ID_PREFIX}${page._id}|${label}]]`;
+    const resolvedTarget = resolved.get(target.toLowerCase());
+    if (!resolvedTarget) return original;
+    const record = resolvedTarget.record;
+    const label = String(rawLabel || record.title).trim() || record.title;
+    const prefix = resolvedTarget.kind === "page" ? PAGE_ID_PREFIX : RECIPE_ID_PREFIX;
+    return `[[${prefix}${record._id}|${label}]]`;
   });
 }

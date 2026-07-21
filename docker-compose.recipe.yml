@@ -1,0 +1,8 @@
+services:
+  recipe-worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    env_file:
+      - worker/.env
+    restart: unless-stopped
