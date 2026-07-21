@@ -22,12 +22,12 @@ Each person has **their own login + password** (per-user accounts via `@convex-d
 5. **Rules** — wiki notes (e.g. "don't use kitchen cloth on toilets"); **admin-only add/edit/delete**; pinned rules surface on Today
 6. **Wiki links** — `[[Page Name]]` syntax works everywhere content is edited (a *feature*, not a wiki-app index)
 7. **Shopping** — shared realtime list (its own tab); both users can add; pending items stay until bought; bought items remain checked for the current Singapore day, then leave the active view while remaining in history; creator/admin/owner delete
-8. **i18n by default** — UI strings locale-keyed from day one (English UI in V1, additional locale files drop in later). User-content entities carry optional translation fields (`localName`, optional `localContent`); no auto-translation in V1.
+8. **i18n by default** — UI strings are locale-keyed. English, Burmese, and Indonesian UI bundles ship today. Typed task content has an operator-gated, on-demand translation pilot; see `docs/translation.md`.
 9. **Auth** — per-user accounts, per-user password; truthful "added by"
 
 ### Explicitly out of V1
-- Auto-translation of user content (local language ↔ English) — entities have translation fields but they're filled manually in V1
-- Additional UI translation files — scaffolding is in place; specific locale files ship in V2
+- Auto-translation beyond the gated one-off-task pilot
+- Additional UI/content locales beyond the currently supported set
 - Barcode scanning for items/groceries
 - Audio pronunciation for local-language content
 - Delete for household note pages. Rules and routines can be deleted by admins/owners; deleting a routine also deletes its completion history. One-off tasks and shopping rows can be deleted by their creator or a family admin/owner.
@@ -35,8 +35,8 @@ Each person has **their own login + password** (per-user accounts via `@convex-d
 - Inventory/stock tracking (groceries = shopping list only)
 
 ### V2 candidates
-- Auto-translation of typed content (local language ↔ English)
-- Additional UI translation file (a locale file) + language switcher
+- Expand typed-content translation to routines, shopping, notes, and rules after language-specific review
+- Additional reviewed UI/content locales
 - Bidirectional backlinks / link graph view
 - Recipes with ingredient → grocery-list generation
 - Item inventory + low-stock alerts
@@ -87,7 +87,7 @@ Single source of truth: `convex/schema.ts`. All tables use Convex IDs.
 ```
 **Indexes:** `slug` (for lookup), `title` (for link resolution), `by_type` (`type, updatedAt`), `pinned_rules` (`type, pinnedToToday` where type="rule"). Slug uniqueness is enforced in mutations by checking the indexed lookup before insert/update.
 
-**i18n note:** `content` + `localContent` are the V1 manual-translation pattern. If `localContent` is present, the item view shows a language toggle (or auto-displays based on viewer locale). No auto-translation in V1 — V2 hooks a translation provider to populate `localContent` automatically on save.
+**i18n note:** `content` + `localContent` remain the manual page-translation pattern. The on-demand translation pilot applies only to one-off task titles and notes; page-body translation is deferred until Markdown can be segmented and reconstructed safely.
 
 ### `links` — outbound wiki links from a page (for backlinks)
 ```ts
@@ -360,24 +360,25 @@ Today's checklist                  ← label-caps, tertiary
 - Sticky top bar with contextual title + actions per route (search icon always present)
 - On desktop (≥768px): left rail replaces bottom bar; content max-width 480px centered (keeps the editorial phone feel)
 
-### 6.10 i18n
+### 6.10 i18n and typed-content translation
 
-Two layers, only one active in V1:
+**A. UI strings**
+- All UI labels go through `react-i18next`'s `t()` — never raw strings in components.
+- Locale files currently ship for English (`en`), Burmese (`my`), and Indonesian (`id`).
+- Locale resolution uses the signed-in account's `userProfiles.locale`, with `en` as fallback.
+- The Language screen lets users select their UI locale.
 
-**A. UI strings (V1 — scaffold ready)**
-- All UI labels go through `react-i18next`'s `t()` — never raw strings in components
-- Locale files: `src/locales/en.json` (active in V1) + `additional locale file` (empty placeholder, drops in for V2)
-- Locale resolution: per-account `userProfiles.locale` → browser `Accept-Language` → default `en`
-- No language switcher UI in V1 (would be dead with only one language); adding a locale file + a switcher is a V2 task
-- The scaffold guarantees we never hard-code an English string anywhere, so V2 translation work is pure data entry
+**B. User content**
+- Authored entity fields remain the permanent source of truth.
+- `pages.localName` and `pages.localContent` remain manually authored page fields.
+- One-off task titles and notes have an on-demand translation pilot backed by separate `contentTranslations` cache rows; source fields are never replaced.
+- Translation is enabled per profile only when `userProfiles.autoTranslateEnabled === true`. Missing/false is disabled, new profiles default false, and no public application mutation can change it.
+- The Language screen displays the flag as a disabled switch. An operator changes it directly in the Convex database.
+- A gated viewer sees source immediately; missing translations are generated for that viewer's selected locale only when supported task content is viewed.
+- OpenRouter is the provider gateway. The default model is `deepseek/deepseek-v4-flash`; credentials remain server-side in `OPENROUTER_API_KEY`.
+- Routines, shopping, Search, notes, rules, and page bodies remain source/manual-only until explicitly expanded and reviewed.
 
-**B. User content (V1 — manual, V2 — auto)**
-- `pages.localName` (notes) — manual, populated by admin at note creation
-- `pages.localContent` (optional) — a manual local-language markdown body; if present, the note view shows a language toggle. V2 auto-populates this via a translation mutation hook
-- `routines.title` / `tasks.title` — single-language English strings in V1. **V2 migration:** field becomes a translations map such as `titleI18n: { en: string, [locale: string]: string }` when we add the auto-translation provider; the V1 schema is forward-compatible only insofar as the migration is mechanical (no UI change required). Not pre-emptively over-engineered in V1.
-- No auto-translation in V1. V2 hooks a translation provider into the `pages:save` / `tasks:add` mutations to populate requested locales automatically.
-
-The goal: ship V1 in English with the UI i18n machinery firmly in place, so V2 = "add a locale file + a switcher + content translation fields," not "refactor 50 components." Respects your instruction to want i18n by default without paying for actual translation in V1.
+Operational instructions and exact flag behavior live in `docs/translation.md`. The detailed lifecycle and safety design live in `docs/plans/2026-07-16-lazy-normalized-content-translation.md`.
 
 ### 6.11 Permissions matrix
 
@@ -559,7 +560,7 @@ Each phase ends with something you can open and tap. No phase ships a half-featu
 - Offline tolerance (Convex cache)
 - Rule delete confirmations
 - Export/backup (dump all pages to markdown)
-- V2 prep: i18n string extraction, auto-translation hook points
+- Translation expansion only after the gated task pilot passes language review
 
 ---
 
@@ -579,7 +580,7 @@ Each phase ends with something you can open and tap. No phase ships a half-featu
 12. **Rules → admin-only full CRUD** (add + edit + delete). User view-only. **(User-confirmed corrects an earlier note that said "anyone can add.")**
 13. **Notes → anyone can add (user photographs + creates), admin-only edits, no delete in V1.** Notes retain the internal `item` page type to avoid a needless data migration.
 14. **Future-dated tasks → show in "Upcoming" section on Routines tab**, not on Today (until their date arrives).
-15. **i18n by default**, two layers: (A) UI strings locale-keyed via `react-i18next` from day one — all components use `t()`, English `en.json` active, a locale file placeholder drops in for V2. No switcher UI in V1. (B) User-content i18n is manual in V1 (`pages.localName`, optional `pages.localContent`); V2 adds auto-translation + per-content translations map for routines/tasks. See §6.10 (i18n).
+15. **i18n by default, with an operator-gated task translation pilot.** UI strings use `react-i18next` with English, Burmese, and Indonesian bundles plus a per-profile language selector. Page-local fields remain manual. One-off task titles/notes use a separate lazy cache only for profiles whose database-managed `autoTranslateEnabled` flag is true; authored source is never replaced. See §6.10 and `docs/translation.md`.
 16. **Stable direct links and resolved wiki identity.** Canonical view routes are `/notes/:id`, `/rules/:id`, `/tasks/:id`, `/routines/:id`, and `/shopping/:id`. Authors type `[[Page Title]]`, but mutations resolve successful references to `[[page:<id>|Display Label]]` before storage. Old `/items/:id`, title-token, and `/p/:slug` routes remain readable for compatibility; all new resolved links navigate by ID.
 17. **Wiki-link autocomplete uses two modes.** Passive suggestions inspect only the active trailing phrase and require a strong title match, so stale matches disappear as typing continues and replacement has an exact character range. Typing `[[` explicitly opens broad fuzzy item/rule search for intentional linking.
 18. **Completed rows remain visible through the day.** A completed task or bought shopping row stays in its current list as a checked row until the Singapore calendar date changes. The next day's date-scoped query removes it from the active list without deleting history.
@@ -598,7 +599,7 @@ Each phase ends with something you can open and tap. No phase ships a half-featu
 
 - **User-created note quality** — notes a user adds go live immediately without admin review. If low-quality notes become a problem, V2 adds an approval queue. Decide by observation post-launch.
 - **Rules deletion softening** — V1 hard-deletes rules (admin-only). If you want a soft-delete (rule hidden but recoverable) for accidentally-removed rules, tell me before Phase 3.
-- **`routines`/`tasks` content translation** — V1 keeps titles as plain English strings. The V2 migration to a locale-keyed `titleI18n` map is mechanical but should land alongside the auto-translation provider so the field isn't half-empty.
+- **Translation expansion** — decide whether the gated task pilot is reliable enough to extend to routines, shopping, notes, rules, and structurally segmented page bodies.
 
 ---
 

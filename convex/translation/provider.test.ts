@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_TRANSLATION_MODEL,
   parseProviderResults,
+  targetLanguageForLocale,
+  targetLanguageTagForLocale,
   TranslationProviderError,
 } from './provider'
 
@@ -13,6 +15,15 @@ const input = {
 }
 
 describe('translation provider response validation', () => {
+  it('maps the app locale my explicitly to Burmese, not Malay', () => {
+    expect(targetLanguageForLocale('my')).toContain('Burmese')
+    expect(targetLanguageForLocale('my')).toContain('never Malay')
+    expect(targetLanguageTagForLocale('my')).toBe('my-MM')
+    expect(() => targetLanguageForLocale('ms')).toThrow(
+      'provider_unsupported_target_locale',
+    )
+  })
+
   it('returns a validated result and computes source/target equality itself', () => {
     const [result] = parseProviderResults(
       JSON.stringify({

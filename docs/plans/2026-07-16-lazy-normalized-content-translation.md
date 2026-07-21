@@ -1,10 +1,10 @@
 # On-Demand Normalized Text Translation Implementation Plan
 
-**Goal:** Translate user-typed household content into the viewer's selected language while preserving the authored text, handling informal English/Singlish correctly, and doing no translation work until that locale is actually needed.
+**Goal:** Translate user-typed household content into the viewer's selected language while preserving the authored text, interpreting colloquial or locally phrased input as clear standard English, and doing no translation work until that locale is actually needed.
 
 **Core decision:** Use one opt-in read-through translation cache. Saving content stores only the authored source. When the signed-in viewer's database-controlled flag is enabled, a visible route shows the source immediately, reads any cached result for the viewer's locale, and requests one missing result in the background. There is no save-triggered translation, blanket backfill, locale fan-out, or separate voice pipeline.
 
-**First release scope:** Prove English/Singlish task text to Burmese on Today and task detail. Do not expand to other entities or languages until the Burmese helper accepts the result.
+**First release scope:** Prove colloquial English task text, including Singlish examples, to Burmese on Today and task detail. Do not expand to other entities or languages until the Burmese helper accepts the result.
 
 ---
 
@@ -147,7 +147,7 @@ default model. `OPENROUTER_TRANSLATION_MODEL` may override the model at the
 deployment level without adding provider-selection UI or changing client code.
 The server credential is `OPENROUTER_API_KEY`.
 
-Evaluate at most two credible hosted multilingual models using a small redacted corpus of real-style household phrases. The corpus must include Singlish, incomplete grammar, negation, quantities, wiki links, and Burmese-authored text for English output.
+Evaluate at most two credible hosted multilingual models using a small redacted corpus of real-style household phrases. The corpus must include varied colloquial and dialectal phrasing (including Singlish), incomplete grammar, code-switching, negation, quantities, wiki links, and Burmese-authored text for English output.
 
 Choose one provider only after:
 
@@ -347,7 +347,7 @@ The Language page renders the disabled/read-only switch from the live profile va
 
 ### Phase 0 — Quality gate
 
-**Objective:** Decide whether normalized English/Singlish-to-Burmese translation is good enough to ship.
+**Objective:** Decide whether normalized colloquial-English-to-Burmese translation is good enough to ship.
 
 - Create a small redacted evaluation corpus with expected preserved facts.
 - Evaluate no more than two hosted multilingual models.
@@ -465,7 +465,7 @@ Changing a profile to an allowed locale requires no data migration or backfill.
 
 ## 10. Acceptance criteria
 
-- Informal typed English/Singlish is translated into helper-approved Burmese without losing actions, objects, negation, quantities, dates, order, or urgency.
+- Informal, colloquial, or locally phrased typed input is normalized into clear standard English and translated into helper-approved Burmese without losing actions, objects, negation, quantities, dates, order, or urgency.
 - Every existing and newly created profile has auto-translation effectively disabled by default.
 - The Language page shows the current state but provides no working toggle action.
 - Only a direct database edit can enable or disable the profile flag.

@@ -8,7 +8,7 @@ with wiki-style links.
 
 - React 19, TypeScript, Vite, and Tailwind CSS v4
 - Convex for realtime data, file storage, HTTP endpoints, and password auth
-- `react-i18next` with English and Burmese UI locales
+- `react-i18next` with English, Burmese, and Indonesian UI locales
 
 ## Local development
 
@@ -48,6 +48,7 @@ major releases.
 
 - [`DESIGN.md`](DESIGN.md) — visual and interaction design system
 - [`docs/plans/PLAN.md`](docs/plans/PLAN.md) — product and implementation plan
+- [`docs/translation.md`](docs/translation.md) — translation feature flag and operator guide
 - [`docs/adr/`](docs/adr/) — architecture decision records
 
 ## Deploy with Convex and Cloudflare Pages

@@ -49,6 +49,34 @@ function baseLocale(locale: string): string {
   return locale.trim().toLowerCase().split(/[-_]/)[0] ?? "";
 }
 
+const TARGET_LANGUAGE_BY_LOCALE: Record<
+  string,
+  { language: string; tag: string }
+> = {
+  en: { language: "English", tag: "en" },
+  my: {
+    language: "Burmese (Myanmar language; မြန်မာဘာသာ; never Malay)",
+    tag: "my-MM",
+  },
+  id: { language: "Indonesian (Bahasa Indonesia)", tag: "id-ID" },
+};
+
+function targetForLocale(locale: string): { language: string; tag: string } {
+  const target = TARGET_LANGUAGE_BY_LOCALE[baseLocale(locale)];
+  if (!target) {
+    throw new TranslationProviderError("provider_unsupported_target_locale");
+  }
+  return target;
+}
+
+export function targetLanguageForLocale(locale: string): string {
+  return targetForLocale(locale).language;
+}
+
+export function targetLanguageTagForLocale(locale: string): string {
+  return targetForLocale(locale).tag;
+}
+
 export function parseProviderResults(
   content: string,
   inputs: TranslationProviderInput[],
@@ -138,8 +166,11 @@ export async function translateBatch(
           {
             role: "system",
             content:
-              "You normalize informal household instructions and translate them. " +
-              "Understand Singapore English and Singlish, including omitted grammar and discourse particles such as ah, lah, already, and can. " +
+              "You interpret and translate informal household instructions. For each item, first infer the intended meaning from colloquial, dialectal, grammatically incomplete, code-switched, or speech-like text. " +
+              "Write normalizedSource as a clear, natural standard-English sentence, then translate that normalized meaning into the requested target language in the same response. " +
+              "Resolve fillers, discourse particles, omitted words, local idioms, and nonstandard grammar from context instead of copying them literally. " +
+              "Treat each item's targetLanguage as authoritative; specifically, locale my means Burmese/Myanmar (မြန်မာဘာသာ), never Malay. " +
+              "When the intended speech act is a command, normalizedSource must be a direct imperative rather than a description of the listener's habits. " +
               "Preserve every action, object, negation, name, quantity, date, sequence, urgency, URL, code span, and __BT_*__ placeholder. " +
               "Do not add advice or make an instruction stricter or weaker. " +
               "Return valid JSON only as {\"results\":[{\"id\":string,\"detectedSourceLocale\":string,\"normalizedSource\":string,\"translatedText\":string,\"sourceIsTarget\":boolean}]}. " +
@@ -147,7 +178,13 @@ export async function translateBatch(
           },
           {
             role: "user",
-            content: JSON.stringify({ items: inputs }),
+            content: JSON.stringify({
+              items: inputs.map((input) => ({
+                ...input,
+                targetLocale: targetLanguageTagForLocale(input.targetLocale),
+                targetLanguage: targetLanguageForLocale(input.targetLocale),
+              })),
+            }),
           },
         ],
       }),
