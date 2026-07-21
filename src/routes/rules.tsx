@@ -7,7 +7,7 @@ import { InlineRuleComposer } from '@/components/InlineRuleComposer'
 import { usePages } from '@/data/hooks'
 import { pagePath } from '@/lib/record-route'
 
-/** Catalog of rule pages — admin full CRUD, helper view-only (§6.6). */
+/** Catalog of rule pages — admin full CRUD, user view-only (§6.6). */
 export default function Rules() {
   const { t } = useTranslation()
   const rules = usePages('rule')

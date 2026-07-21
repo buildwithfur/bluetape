@@ -10,7 +10,7 @@ import { pagePath, recordPath } from '@/lib/record-route'
 import { wikiPlainText } from '@/lib/wiki'
 import type { Doc } from '@convex/_generated/dataModel'
 
-/** Modal command palette — searches items, rules, tasks (PLAN.md §6.7).
+/** Modal command palette — searches notes, rules, tasks (PLAN.md §6.7).
  * Routines are excluded. On mobile the query dock stays above the keyboard,
  * with results in a sheet behind it. */
 export function SearchPalette() {

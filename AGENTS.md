@@ -18,12 +18,12 @@ Operating rules for AI agents (and human contributors) working in this repo.
 
 ## Project Context
 
-Bluetape is a household coordination web app — a helper and her employer (both in Singapore) coordinate routines, one-off tasks, household items (with photos + local-language names), rules, and a shared shopping list. Everything is interconnected by wiki-style `[[links]]`.
+Bluetape is a household coordination web app — household users in Singapore coordinate routines, one-off tasks, household notes (with optional photos + local-language names), rules, and a shared shopping list. Everything is interconnected by wiki-style `[[links]]`.
 
 - **Stack:** React 19 + Vite + TypeScript (frontend), Convex (backend / DB / realtime / file storage / auth), Tailwind CSS v4, `react-i18next`, `markdown-it` with a custom `[[wiki link]]` plugin.
 - **Hosting:** Convex deployment + Cloudflare Pages, auto-deploy on push to `main` via GitHub integration.
 - **Reference timezone:** Asia/Singapore (client-computed "today", sent to Convex as `YYYY-MM-DD`; instants stored as Unix timestamps UTC).
-- **Auth:** per-user accounts (employer + helper) via `@convex-dev/auth` password provider. App-level profile fields (locale, timezone, displayName) live in `userProfiles`; roles live in `familyMembers` — never modify the auth provider's `users` table.
+- **Auth:** per-user accounts (admin + user) via `@convex-dev/auth` password provider. App-level profile fields (locale, timezone, displayName) live in `userProfiles`; roles live in `familyMembers` — never modify the auth provider's `users` table.
 - **The two source-of-truth docs are `DESIGN.md` and `docs/plans/PLAN.md`. Read both before making changes.**
 
 ## Planning
@@ -78,12 +78,12 @@ Bluetape is a household coordination web app — a helper and her employer (both
 These come from `PLAN.md` and are non-negotiable for V1. Violating them undoes decisions the user explicitly made.
 
 - **Permissions are enforced in Convex mutations, not just the UI.** Check `ctx.auth.getUserIdentity()` → `userProfiles.role` before every write. UI hides controls per role via `RoleGate`, but the server is the real gate.
-- **Delete is limited to rules (admin-only), one-off tasks (creator/admin/owner), and shopping rows (creator/admin/owner), all hard delete.** Household item pages persist. Bought shopping rows normally leave the active list by date/status query.
+- **Delete is limited to rules and routines (admin/owner), one-off tasks (creator/admin/owner), and shopping rows (creator/admin/owner), all hard delete.** Deleting a routine also deletes its completion history. Household note pages persist. Bought shopping rows normally leave the active list by date/status query.
 - **One-off task titles and notes are editable by admins/owners**, while completion can toggle between `pending` and `done` for any family member. Due dates remain fixed after creation. The creator or a family admin/owner can hard-delete a task.
-- **Rules are employer-only full CRUD.** Helper is view-only.
-- **Items: anyone can create, employer-only edits, no delete in V1.** Helper-created items go live immediately (no review queue).
+- **Rules are admin-only full CRUD.** User is view-only.
+- **Notes: anyone can create, admin-only edits, no delete in V1.** Notes remain stored as `pages.type === "item"` internally. User-created notes go live immediately (no review queue).
 - **Shopping: pending items stay until bought.** No daily reset or carry-over. Bought rows remain visible through the current Singapore day. The row creator or an admin/owner may delete.
-- **Wiki links are a feature, not the product.** No Pages index, no browse-all surface, no graph view in V1. Pages are reached by `[[link]]` or by Search (modal command palette). The helper's daily surface is Today.
+- **Wiki links are a feature, not the product.** No Pages index, no browse-all surface, no graph view in V1. Pages are reached by `[[link]]` or by Search (modal command palette). The user's daily surface is Today.
 - **i18n by default for UI strings** — every component renders text through `react-i18next`'s `t()`. No hard-coded English in components, even though V1 ships only `en.json`.
 - **"Today" is client-computed in Asia/Singapore.** Pass `YYYY-MM-DD` to Convex queries; never let Convex decide what "today" means in UTC.
 - **Follow the official Convex + React integration pattern** (https://docs.convex.dev/quickstart/react): `ConvexProvider` + `ConvexReactClient` in `src/main.tsx`, schema + queries in `convex/`, `useQuery`/`useMutation` in components. File storage uploads use the 3-step `generateUpload URL → POST → save storageId` flow.

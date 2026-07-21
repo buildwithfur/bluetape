@@ -5,7 +5,7 @@ export type RecordKind = 'item' | 'rule' | 'task' | 'routine' | 'shopping'
 export function recordPath(kind: RecordKind, id: string): string {
   switch (kind) {
     case 'item':
-      return `/items/${id}`
+      return `/notes/${id}`
     case 'rule':
       return `/rules/${id}`
     case 'task':

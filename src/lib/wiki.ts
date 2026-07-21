@@ -46,7 +46,8 @@ export function createMarkdownIt(): MarkdownIt {
     const resolved = resolveWikiTarget(target, env)
     const display = label && label.length ? label : resolved?.title ?? target
     if (resolved) {
-      return `<a class="wikilink" href="/${resolved.type}s/${resolved.id}">${escapeHtml(display)}</a>`
+      const collection = resolved.type === 'item' ? 'notes' : 'rules'
+      return `<a class="wikilink" href="/${collection}/${resolved.id}">${escapeHtml(display)}</a>`
     }
     if (target.toLowerCase().startsWith('page:')) {
       return `<span class="wikilink broken">${escapeHtml(display)}</span>`

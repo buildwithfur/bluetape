@@ -55,6 +55,8 @@ export default function Family() {
   const [name, setName] = useState('')
   const [nameError, setNameError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deletingFamily, setDeletingFamily] = useState(false)
+  const [deleteFamilyError, setDeleteFamilyError] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [newKeyLabel, setNewKeyLabel] = useState('')
   const [revealedKey, setRevealedKey] = useState<string | null>(null)
@@ -365,7 +367,10 @@ export default function Family() {
           <Button
             variant="danger"
             leftIcon={<Trash size={16} aria-hidden="true" />}
-            onClick={() => setConfirmDelete(true)}
+            onClick={() => {
+              setDeleteFamilyError(false)
+              setConfirmDelete(true)
+            }}
           >
             {t('family.delete')}
           </Button>
@@ -374,18 +379,37 @@ export default function Family() {
 
       <BottomSheet
         open={confirmDelete}
-        onClose={() => setConfirmDelete(false)}
+        onClose={() => {
+          setConfirmDelete(false)
+          setDeleteFamilyError(false)
+        }}
         title={t('action.delete')}
         footer={
           <>
-            <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setConfirmDelete(false)
+                setDeleteFamilyError(false)
+              }}
+            >
               {t('action.cancel')}
             </Button>
             <Button
-              variant="primary"
+              variant="danger"
+              disabled={deletingFamily}
               onClick={async () => {
-                await deleteFamily(family._id)
-                navigate('/')
+                if (deletingFamily) return
+                setDeletingFamily(true)
+                setDeleteFamilyError(false)
+                try {
+                  await deleteFamily(family._id)
+                  navigate('/', { replace: true })
+                } catch {
+                  setDeleteFamilyError(true)
+                } finally {
+                  setDeletingFamily(false)
+                }
               }}
             >
               {t('action.delete')}
@@ -393,7 +417,14 @@ export default function Family() {
           </>
         }
       >
-        {t('family.deleteConfirmation', { name: family.name })}
+        <div className="space-y-3">
+          <p>{t('family.deleteConfirmation', { name: family.name })}</p>
+          {deleteFamilyError && (
+            <p role="alert" className="text-sm text-error-accent">
+              {t('family.deleteFailed')}
+            </p>
+          )}
+        </div>
       </BottomSheet>
 
       {/* Reveal a newly-created API key exactly once. */}
@@ -453,8 +484,8 @@ function RoleMenu({
   onChange,
 }: {
   name: string
-  role: 'admin' | 'helper'
-  onChange: (role: 'admin' | 'helper') => Promise<unknown>
+  role: 'admin' | 'user'
+  onChange: (role: 'admin' | 'user') => Promise<unknown>
 }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
@@ -477,7 +508,7 @@ function RoleMenu({
     }
   }, [open])
 
-  const roles = ['helper', 'admin'] as const
+  const roles = ['user', 'admin'] as const
 
   return (
     <div ref={menuRef} className="relative">

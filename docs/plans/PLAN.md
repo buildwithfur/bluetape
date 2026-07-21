@@ -1,6 +1,6 @@
 # Bluetape — Build Plan
 
-A household coordination app. A helper opens it each morning on her phone to see what to do today; her employer manages routines, items, and rules. Everything is interconnected by wiki-style `[[links]]`.
+A household coordination app. A user opens it each morning on their phone to see what to do today; an admin manages routines, notes, and rules. Everything is interconnected by wiki-style `[[links]]`.
 
 ---
 
@@ -9,16 +9,16 @@ A household coordination app. A helper opens it each morning on her phone to see
 ### Users
 | Person | Primary use |
 |---|---|
-| **Helper** (primary) | Opens "Today" daily, marks routines/tasks done, references household items by photo + local-language name, adds shopping items + one-off tasks |
-| **Employer** (secondary) | Creates routines, items, rules; adds tasks; reviews progress; edits rules + items |
+| **User** (primary) | Opens "Today" daily, marks routines/tasks done, references household notes by photo + local-language name, adds shopping items + one-off tasks |
+| **Employer** (secondary) | Creates routines, notes, rules; adds tasks; reviews progress; edits rules + notes |
 
-Each user has **their own login + password** (per-user accounts via `@convex-dev/auth`), with an app role (`admin` for the homeowner/employer, or `helper`) stored in `userProfiles`. Enables truthful "added by" attribution + permission enforcement. See §6.11.
+Each person has **their own login + password** (per-user accounts via `@convex-dev/auth`), with a family role (`admin` or `user`) stored in `familyMembers`. Enables truthful "added by" attribution + permission enforcement. See §6.11.
 
 ### V1 Features
 1. **Today dashboard** — flat unified checklist of routines due today + one-off tasks due today, check-off
-2. **Routines** — daily / weekly / monthly recurrence; each links to a wiki page. Helper view-only; future-dated tasks show in an "Upcoming" section here
+2. **Routines** — daily / weekly / monthly recurrence; each links to a wiki page. User view-only; future-dated tasks show in an "Upcoming" section here
 3. **Tasks** — one-off todos; anyone can add and toggle done/not done; admin/owner title-note editing; creator/admin/owner delete
-4. **Household items** — wiki pages with title and photo; anyone can add, admin-only edits, no delete in V1
+4. **Household notes** — wiki pages with title and optional photo; anyone can add, admin-only edits, no delete in V1. Stored internally as `pages.type === "item"` for schema compatibility.
 5. **Rules** — wiki notes (e.g. "don't use kitchen cloth on toilets"); **admin-only add/edit/delete**; pinned rules surface on Today
 6. **Wiki links** — `[[Page Name]]` syntax works everywhere content is edited (a *feature*, not a wiki-app index)
 7. **Shopping** — shared realtime list (its own tab); both users can add; pending items stay until bought; bought items remain checked for the current Singapore day, then leave the active view while remaining in history; creator/admin/owner delete
@@ -26,16 +26,16 @@ Each user has **their own login + password** (per-user accounts via `@convex-dev
 9. **Auth** — per-user accounts, per-user password; truthful "added by"
 
 ### Explicitly out of V1
-- Auto-translation of user content (helper language ↔ English) — entities have translation fields but they're filled manually in V1
+- Auto-translation of user content (local language ↔ English) — entities have translation fields but they're filled manually in V1
 - Additional UI translation files — scaffolding is in place; specific locale files ship in V2
 - Barcode scanning for items/groceries
-- Audio pronunciation for helper-language content
-- Delete for household item pages. Rules can be deleted by admins; one-off tasks and shopping rows can be deleted by their creator or a family admin/owner.
+- Audio pronunciation for local-language content
+- Delete for household note pages. Rules and routines can be deleted by admins/owners; deleting a routine also deletes its completion history. One-off tasks and shopping rows can be deleted by their creator or a family admin/owner.
 - A browsing "Pages index" / recent-changes / orphan-page / graph views. **Wiki-style links are a feature inside the app, not the app itself.** Pages are reached by link or by search, not by browsing an index.
 - Inventory/stock tracking (groceries = shopping list only)
 
 ### V2 candidates
-- Auto-translation of typed content (helper language ↔ English)
+- Auto-translation of typed content (local language ↔ English)
 - Additional UI translation file (a locale file) + language switcher
 - Bidirectional backlinks / link graph view
 - Recipes with ingredient → grocery-list generation
@@ -57,7 +57,7 @@ Each user has **their own login + password** (per-user accounts via `@convex-dev
 - **Fonts:** Satoshi (Fontshare), JetBrains Mono, Noto Sans
 - **Language:** TypeScript throughout
 
-**Why Convex:** the realtime DB means the helper marking a task done instantly reflects on the employer's view; file storage handles item photos without a separate bucket; per-user password auth is built in. No server to run.
+**Why Convex:** the realtime DB means a user marking a task done instantly reflects on the admin's view; file storage handles item photos without a separate bucket; per-user password auth is built in. No server to run.
 
 **Why Tailwind v4 + `DESIGN.md` tokens:** the design spec already defines CSS variables; we map them into Tailwind's `@theme` block so components use `bg-surface text-ink` etc.
 
@@ -75,8 +75,8 @@ Single source of truth: `convex/schema.ts`. All tables use Convex IDs.
   type: "item" | "rule",
   content: string,         // markdown body (English) with [[wiki links]]
   // type-specific metadata (only relevant fields populated)
-  localName?: string,     // items only — helper-language / local-language name
-  localContent?: string,  // optional markdown body in helper's preferred language
+  localName?: string,     // items only — local-language name
+  localContent?: string,  // optional markdown body in the user's preferred language
   location?: string,       // items only (e.g. "Kitchen Cabinet 3")
   photoId?: Id<"_storage">, // items only — Convex file storage ref
   pinnedToToday?: boolean,  // rules only — surfaces as a callout on Today
@@ -189,7 +189,7 @@ The reference timezone for V1 is **Asia/Singapore**. The model:
 - **Calendar dates** (routine due day, task due date, routine completion "for which day") → stored as **ISO date strings `"YYYY-MM-DD"`**, not timestamps. "Today" is a calendar concept, not an instant.
 - **"Today" is computed on the client in Asia/Singapore**, then the date string is sent to Convex queries. This avoids the midnight-UTC bug (a routine completed at 11:55pm SG belonging to the wrong UTC day). Convex never decides what "today" means in UTC.
 - **UI formatting**: all instants render to SG time via `Intl.DateTimeFormat('en-SG', { timeZone: 'Asia/Singapore', ... })`. Mono labels ("Tue · 7 Jul", "Updated 2 Jul") use this.
-- **Admin's locale** is the app default. If the helper ever travels, we add a per-user timezone setting later; V1 hard-codes SG.
+- **Admin's locale** is the app default. If a user travels, we add a per-user timezone setting later; V1 hard-codes SG.
 
 This is standard timestamp-vs-date discipline. The non-obvious part is computing "today" client-side rather than server-side.
 
@@ -223,14 +223,14 @@ The query is reactive — marking a routine done updates the dashboard instantly
 
 ### 5.3 Upcoming tasks computation
 
-`routines:upcoming()` returns tasks where `status === "pending"` AND `dueDate > today`, sorted by `dueDate` asc. Shown on the Routines tab under an "Upcoming" section header (§6.4). Surfaces future-dated one-off work in the place the helper already looks for scheduled work.
+`routines:upcoming()` returns tasks where `status === "pending"` AND `dueDate > today`, sorted by `dueDate` asc. Shown on the Routines tab under an "Upcoming" section header (§6.4). Surfaces future-dated one-off work in the place the user already looks for scheduled work.
 
 ---
 
 ## 6. Screen Specs
 
 ### 6.1 Today (Dashboard) — `/`
-**Layout:** single column, flat (no Morning/Afternoon grouping). A unified checklist of everything due today — **recurring routines that fall on today + one-off tasks due today** — with the same checkable-row treatment throughout. The helper doesn't think "routine vs task"; she thinks "what do I do today." Hairline-divided rows.
+**Layout:** single column, flat (no Morning/Afternoon grouping). A unified checklist of everything due today — **recurring routines that fall on today + one-off tasks due today** — with the same checkable-row treatment throughout. The user thinks "what do I do today," not "routine vs task." Hairline-divided rows.
 
 ```
 [Sticky top bar]
@@ -270,18 +270,18 @@ Today's checklist                  ← label-caps, tertiary
 - Pull to refresh: re-reads "today" (handles the case of opening past midnight)
 - Empty state keeps the inline add-task row visible so either user can immediately create a task
 
-**What is NOT on Today:** shopping list (lives on its own Shopping tab), routine templates (Routines tab), the item/rule catalog (More tab). Today is purely the day's checklist + pinned rule callout.
+**What is NOT on Today:** shopping list (lives on its own Shopping tab), routine templates (Routines tab), the note/rule catalog (More tab). Today is purely the day's checklist + pinned rule callout.
 
-### 6.2 Item / Rule View — `/items/:id` and `/rules/:id`
+### 6.2 Note / Rule View — `/notes/:id` and `/rules/:id`
 (Already prototyped — see `prototype/page.html`.)
 
 `/p/:slug` remains a compatibility route, but all newly generated links and share actions use the stable ID route so renaming an entry does not change its URL.
 
 - Sticky top bar: back, Edit (ghost button), overflow (Delete only for admin on rule pages, copy link)
-- Photo (items only), 4:3, hairline frame
+- Photo (notes only), 4:3, hairline frame
 - `label-caps` type badge + location + updated date in mono
-- Helper-language name inline (no box) — `label-caps` label, then 24px script
-- Markdown content rendered; `[[links]]` resolved to the target's stable `/items/:id` or `/rules/:id` URL
+- Local-language name inline (no box) — `label-caps` label, then 24px script
+- Markdown content rendered; `[[links]]` resolved to the target's stable `/notes/:id` or `/rules/:id` URL
 - Broken links: dashed underline, tertiary → tapping opens "Create this page?" prompt
 - No visible backlinks section in V1; outbound link records remain stored for future backlink/graph features
 
@@ -289,7 +289,7 @@ Today's checklist                  ← label-caps, tertiary
 - Title input (label above)
 - Type selector: segmented control (Item / Rule / Recipe / General)
 - Conditional fields based on type:
-  - **Item:** Photo with explicit Upload photo and Take photo actions (uses Convex upload URL flow). Helper-language name and location are not authored in the V1 form; legacy stored values remain readable.
+  - **Note:** Photo with explicit Upload photo and Take photo actions (uses Convex upload URL flow). Local-language name and location are not authored in the V1 form; legacy stored values remain readable.
   - **Rule:** a `pinToToday` toggle ("Show as reminder on Today")
   - **Recipe:** nothing extra in V1 (it's just markdown)
   - **General:** nothing extra
@@ -298,7 +298,7 @@ Today's checklist                  ← label-caps, tertiary
 - Sticky bottom bar: Cancel (ghost) · Save (primary). Save disabled while empty title.
 
 ### 6.4 Routines — `/routines`
-**Permissions:** helper can **view** this tab (tap into routines, follow inline `[[links]]`), but **cannot create/edit/delete**. Only admins manage the recurring schedule. Inline add rows and edit affordances are hidden for the helper; rows are tappable (read details) but not editable.
+**Permissions:** users can **view** this tab (tap into routines, follow inline `[[links]]`), but **cannot create/edit/delete**. Only admins manage the recurring schedule. Inline add rows and edit affordances are hidden for users; rows are tappable (read details) but not editable.
 
 **Layout:**
 - Daily / Weekly / Monthly groups are always visible, each with a `label-caps` section header
@@ -325,26 +325,26 @@ Today's checklist                  ← label-caps, tertiary
 - Each row has a stable detail URL (`/shopping/:id`) for deep linking and sharing.
 
 ### 6.6 More — `/more`
-**Permissions:** helper can view both catalogs and **add items** (helper can photograph + create items). **Rules are admin-only** add/edit/delete. **No delete on items in V1.**
+**Permissions:** users can view both catalogs and **add notes** (users can photograph + create notes). **Rules are admin-only** add/edit/delete. **No delete on notes in V1.**
 
 - Two list entries, each opens a filtered catalog:
-  - **Rules** → list of pages where `type === "rule"` — admin sees FAB + edit/delete affordances; helper sees read-only list
-  - **Items** → list of pages where `type === "item"` — both users see FAB `+` to create; helper-created items go live immediately (admin can refine)
-- Lists are simple title + updated date, hairline-divided. Tap → wiki page view (§6.2)
-- These catalogs exist so a rule/item is reachable by browsing as well as by `[[link]]`; they are not a wiki index
+  - **Rules** → list of pages where `type === "rule"` — admin sees FAB + edit/delete affordances; users see a read-only list
+  - **Notes** → responsive photo grid of pages where `type === "item"` — both roles see `+ New note`; user-created notes go live immediately (admin can refine)
+- The Notes grid uses cropped 4:3 thumbnails, lazy loading, and two/three/four columns across phone/tablet/desktop widths. Rules remain a hairline-divided list. Tap either kind → wiki page view (§6.2).
+- These catalogs exist so a rule/note is reachable by browsing as well as by `[[link]]`; they are not a wiki index
 - Also hosts **Sign out** (a row here — simplest, no settings chrome needed)
 
 ### 6.7 Search — modal command palette (no tab)
-**Scope:** searches **items, rules, and one-off tasks** only. Does **not** search routines (those are admin-managed on their own tab and the helper doesn't need to find them by text). Triggered from the search icon in the top bar.
+**Scope:** searches **notes, rules, and one-off tasks** only. Does **not** search routines (those are admin-managed on their own tab and users don't need to find them by text). Triggered from the search icon in the top bar.
 
 - V1: client-side filter over reactive loaded lists (pages of type item/rule + tasks)
-- Results grouped by kind: Items / Rules / Tasks
-- "Create new item: *query*" as the first result if no item match → opens the item editor prefilled
+- Results grouped by kind: Notes / Rules / Tasks
+- "Create new note: *query*" as the first result → opens the note editor prefilled
 - Fits DESIGN.md rule: white (`surface-floating`) reserved for search bar / command palette / dropdowns / modals
 - Replaces the need for any browse-all index
 
 ### 6.8 Auth — `/login`
-- Email + password (two accounts: admin/homeowner + helper)
+- Email + password (separate accounts for admins and users)
 - Submit → `@convex-dev/auth` password provider (scrypt-hashed)
 - On success → redirect to Today
 - Failure: inline error below input, `error-text` color
@@ -353,9 +353,9 @@ Today's checklist                  ← label-caps, tertiary
 ### 6.9 App shell
 - **Bottom tab bar: Today · Routines · Shopping · More** (4 tabs)
   - `Today` — the daily checklist (routines + tasks due today, check-off)
-  - `Routines` — recurring schedule (helper view-only, admin manages) + Upcoming tasks section
+  - `Routines` — recurring schedule (user view-only, admin manages) + Upcoming tasks section
   - `Shopping` — shared realtime list (both add/check)
-  - `More` — Rules (admin-only) + Items (anyone-add) catalogs + Sign out
+  - `More` — Rules (admin-only) + Notes (anyone-add) catalogs + Sign out
 - **No Search tab** — search opens as a modal from a top-bar icon
 - Sticky top bar with contextual title + actions per route (search icon always present)
 - On desktop (≥768px): left rail replaces bottom bar; content max-width 480px centered (keeps the editorial phone feel)
@@ -372,8 +372,8 @@ Two layers, only one active in V1:
 - The scaffold guarantees we never hard-code an English string anywhere, so V2 translation work is pure data entry
 
 **B. User content (V1 — manual, V2 — auto)**
-- `pages.localName` (items) — manual, populated by admin at item creation
-- `pages.localContent` (optional) — a manual helper-language markdown body; if present, the item view shows a language toggle. V2 auto-populates this via a translation mutation hook
+- `pages.localName` (notes) — manual, populated by admin at note creation
+- `pages.localContent` (optional) — a manual local-language markdown body; if present, the note view shows a language toggle. V2 auto-populates this via a translation mutation hook
 - `routines.title` / `tasks.title` — single-language English strings in V1. **V2 migration:** field becomes a translations map such as `titleI18n: { en: string, [locale: string]: string }` when we add the auto-translation provider; the V1 schema is forward-compatible only insofar as the migration is mechanical (no UI change required). Not pre-emptively over-engineered in V1.
 - No auto-translation in V1. V2 hooks a translation provider into the `pages:save` / `tasks:add` mutations to populate requested locales automatically.
 
@@ -381,29 +381,29 @@ The goal: ship V1 in English with the UI i18n machinery firmly in place, so V2 =
 
 ### 6.11 Permissions matrix
 
-Two roles: **admin** (homeowner/employer) and **helper** (primary daily user), with the family creator represented as **owner** in permission checks. Hard V1 delete rules: rules are admin-only; one-off tasks and shopping rows are creator/admin/owner-only; household item pages cannot be deleted.
+Two roles: **admin** and **user** (primary daily role), with the family creator represented as **owner** in permission checks. Hard V1 delete rules: rules and routines are admin/owner-only; one-off tasks and shopping rows are creator/admin/owner-only; household note pages cannot be deleted.
 
-| Surface | Helper view | Helper add | Helper edit | Helper delete |
+| Surface | User view | User add | User edit | User delete |
 |---|---|---|---|---|
 | Today checklist | ✓ | one-off tasks | mark routines/tasks done | ✗ |
 | Routine completion | ✓ | — | ✓ both can mark a routine done for today | ✗ |
-| Routines tab (templates) | ✓ | ✗ | ✗ admin-only | ✗ admin-only |
+| Routines tab (templates) | ✓ | ✗ | ✗ admin-only | ✗ admin/owner-only |
 | **Rules** (wiki pages) | ✓ | ✗ **admin-only** | ✗ **admin-only** | ✗ **admin-only** |
-| Items (wiki pages, photos) | ✓ | ✓ anyone | ✗ admin-only | ✗ never in V1 |
+| Notes (wiki pages, photos) | ✓ | ✓ anyone | ✗ admin-only | ✗ never in V1 |
 | Shopping list | ✓ | ✓ both | ✓ both can mark bought | creator/admin/owner |
 | One-off tasks | ✓ | ✓ both | completion: anyone; title/note: admin/owner | creator/admin/owner |
-| Items (creating) | ✓ | ✓ anyone (helper can photograph + create) | — | — |
-| Search | ✓ | "create item" result routes to item editor (anyone) | — | — |
+| Notes (creating) | ✓ | ✓ anyone (user can photograph + create) | — | — |
+| Search | ✓ | "create note" result routes to note editor (anyone) | — | — |
 | Sign out | ✓ | — | — | — |
 
 **Hard simplifications for V1:**
-- **Rules → admin-only full CRUD.** Add, edit, delete all gated to admins. Rules are household policy; the helper follows them, she doesn't author them. (Confirmed by user.)
-- **Delete remains unavailable for household item pages.** One-off tasks and shopping rows can be hard-deleted by their creator or a family admin/owner. Completed rows otherwise remain through the current Singapore day, then leave by date-scoped query.
+- **Rules → admin-only full CRUD.** Add, edit, delete all gated to admins. Rules are household policy; users follow them and don't author them. (Confirmed by user.)
+- **Delete remains unavailable for household note pages.** Routines can be hard-deleted by admins/owners together with their completion history. One-off tasks and shopping rows can be hard-deleted by their creator or a family admin/owner. Completed rows otherwise remain through the current Singapore day, then leave by date-scoped query.
 - **Task title and note are admin/owner editable fields**, while completion toggles between `pending` and `done` via `tasks:toggleDone` for any family member. Due dates remain fixed.
-- **Items: anyone can create, admin-only edits.** Helper can photograph a new product and create the item page; only the admin refines content/adds `[[links]]`. No delete in V1.
-- Default-allow on day-to-day operations (tasks, shopping, item creation, marking done); default-deny on household-policy-adjacent things (routines, rules, item editing).
+- **Notes: anyone can create, admin-only edits.** A user can photograph something and create the note page; only the admin refines content/adds `[[links]]`. No delete in V1.
+- Default-allow on day-to-day operations (tasks, shopping, note creation, marking done); default-deny on household-policy-adjacent things (routines, rules, note editing).
 
-Enforcement: Convex mutations resolve the authenticated user (`ctx.auth.getUserIdentity()` → auth user id → `userProfiles.by_userId` → role) and reject forbidden writes before the DB touch. The UI hides/renders controls per role so the helper never sees a dead button.
+Enforcement: Convex mutations resolve the authenticated user and their `familyMembers` role, then reject forbidden writes before the DB touch. The UI hides/renders controls per role so users never see dead buttons.
 
 ---
 
@@ -420,10 +420,10 @@ Authors still type the readable form `[[Eggs]]`. On save, Convex resolves it wit
 ### Renderer
 For each `wiki_link` token:
 1. Resolve canonical `page:<id>` directly through `pages:wikiTargetMap`. Legacy title tokens use a case-insensitive title lookup for compatibility.
-2. If the record exists → render its stable canonical URL: `<a href="/{items|rules}/{id}" class="wikilink">{label || target}</a>`.
+2. If the record exists → render its stable canonical URL: `<a href="/{notes|rules}/{id}" class="wikilink">{label || target}</a>`.
 3. If an unresolved legacy title is found → render `<a href="/p/new?title={encoded}" class="wikilink broken">{label || target}</a>` (dashed underline, tertiary color). An unresolved canonical ID renders as broken text and never proposes creating a page named after an ID.
 
-The same inline renderer is used for page bodies and task/routine titles. Task and routine authoring searches only items and rules; selecting a suggestion inserts readable `[[Page Title]]` text, which is canonicalized by the mutation before storage. No schema migration is required because the fields remain strings; readers support both formats during the compatibility rollout.
+The same inline renderer is used for page bodies and task/routine titles. Task and routine authoring searches only notes and rules; selecting a suggestion inserts readable `[[Page Title]]` text, which is canonicalized by the mutation before storage. No schema migration is required because the fields remain strings; readers support both formats during the compatibility rollout.
 
 ### Link persistence
 On `pages:save` mutation:
@@ -432,7 +432,7 @@ On `pages:save` mutation:
 3. Re-parse canonical content and insert one `links` doc per unique target with `targetPageId`. Legacy unresolved titles retain only `targetTitle`.
 
 ### Backlinks view
-`pages:backlinks(slug)` remains available for future backlink/graph features, but V1 does not render a "Referenced from" section on item or rule pages.
+`pages:backlinks(slug)` remains available for future backlink/graph features, but V1 does not render a "Referenced from" section on note or rule pages.
 
 ### Edge cases
 - `[[Target|Display Text]]` → display text shown, target used for resolution
@@ -486,9 +486,9 @@ bluetape/
 │   │   │   ├── index.tsx          ← list + Upcoming tasks section
 │   │   │   └── edit.tsx           ← admin-only
 │   │   ├── shopping.tsx          ← the shared list
-│   │   ├── more.tsx               ← entries to Rules + Items catalogs + Sign out
+│   │   ├── more.tsx               ← entries to Rules + Notes catalogs + Sign out
 │   │   ├── rules.tsx              ← catalog of rule pages (admin: FAB+edit+delete)
-│   │   ├── items.tsx              ← catalog of item pages (both: FAB+)
+│   │   ├── items.tsx              ← responsive catalog of note pages (internal item type)
 │   │   ├── pages/
 │   │   │   ├── view.tsx           ← /p/:slug
 │   │   │   └── edit.tsx           ← /p/new + /p/:slug/edit
@@ -523,7 +523,7 @@ Each phase ends with something you can open and tap. No phase ships a half-featu
 - `npm create convex@latest` with React + Vite preset
 - Add `@convex-dev/auth`, tailwind v4, phosphor, markdown-it, fonts
 - Map `DESIGN.md` tokens into `src/theme/tokens.css` + Tailwind `@theme`
-- Convex auth password provider wired; `/login` route with per-user accounts (admin/homeowner + helper, each own password)
+- Convex auth password provider wired; `/login` route with separate per-user accounts for admins and users
 - `AppShell` with bottom tab bar (destinations can be empty placeholders)
 - Deploy: app boots, login works, lands on empty "Today"
 
@@ -544,7 +544,7 @@ Each phase ends with something you can open and tap. No phase ships a half-featu
 - Today dashboard with routine rows, check-circle toggle, day-of-week/month logic
 - Warning callout block (pinned rules surface here)
 - One-off tasks add + `tasks:toggleDone` + Today section ("Today's tasks")
-- **Checkpoint:** Helper can open the app, see today's routines, tap through to item pages, mark done. Admin can set up a weekly/monthly schedule.
+- **Checkpoint:** User can open the app, see today's routines, tap through to item pages, and mark them done. Admin can set up a weekly/monthly schedule.
 
 ### Phase 3 — Groceries + polish
 - `schema.ts` add `groceryItems`
@@ -565,36 +565,38 @@ Each phase ends with something you can open and tap. No phase ships a half-featu
 
 ## 10. Resolved Decisions
 
-1. **Auth model → per-user accounts.** Admin/homeowner + helper each have own password + login. App-level fields (role, locale, timezone, displayName) live in a parallel `userProfiles` table keyed by the auth user ID. Enables truthful "added by" + permission enforcement. See §6.8.
+1. **Auth model → per-user accounts.** Admins and users each have their own password + login. App-level profile fields (locale, timezone, displayName) live in `userProfiles`; family roles live in `familyMembers`. Enables truthful "added by" + permission enforcement. See §6.8.
 2. **Timezone → Asia/Singapore, computed client-side.** Instants stored as Unix timestamps (UTC ms); calendar dates stored as `YYYY-MM-DD` strings; "today" computed on the client in SG, sent to queries. Full model in §4.
 3. **Hosting → Convex + Cloudflare Pages, auto-deploy on push to `main` via GitHub integration.**
-4. **No Pages index / wiki-app surface.** Wiki links are a *feature* (inline `[[...]]` inside tasks, routines, items, and rules), not the product. Wiki targets remain items and rules only. Pages are reached by link or by Search, never by browsing an index. No Pages tab.
+4. **No Pages index / wiki-app surface.** Wiki links are a *feature* (inline `[[...]]` inside tasks, routines, notes, and rules), not the product. Wiki targets remain notes and rules only. Pages are reached by link or by Search, never by browsing an index. No Pages tab.
 5. **Tab bar → 4 tabs: Today · Routines · Shopping · More.** Shopping is its own tab. Search opens as a modal command palette from the top bar, not a tab.
 6. **Today is a flat unified checklist** — recurring routines due today + one-off tasks due today, same checkable-row treatment. No Morning/Afternoon sections. No standalone task index; individual tasks do have `/tasks/:id` detail URLs. Tasks without a due date also surface on Today, future-dated tasks don't (they live in Routines tab's "Upcoming" section).
 7. **Shopping label** = "Shopping" in the UI (table stays `groceryItems`).
 8. **No settings screen in V1.** Sign-out lives in the More tab.
-9. **Search scope → items + rules + tasks only.** Routines excluded.
+9. **Search scope → notes + rules + tasks only.** Routines excluded.
 10. **Shopping → simple active list model.** Pending items stay until bought. Bought items remain visibly checked for the rest of the current Singapore calendar day, then leave the active list the next day while persisting in history unless explicitly deleted by their creator or an admin/owner. No reset or carry-over mutation is needed; the date-scoped query controls visibility.
-11. **Tasks → admin/owner title-note editing; completion is reversible; deletion is creator/admin/owner-only.** Any family member can toggle `pending ↔ done`; toggling to pending clears `completedAt`. Helpers cannot edit task content. Due dates remain fixed. A helper may delete a task they created; admins/owners may delete any task.
-12. **Rules → admin-only full CRUD** (add + edit + delete). Helper view-only. **(User-confirmed corrects an earlier note that said "anyone can add.")**
-13. **Items → anyone can add (helper photographs + creates), admin-only edits, no delete in V1.**
+11. **Tasks → admin/owner title-note editing; completion is reversible; deletion is creator/admin/owner-only.** Any family member can toggle `pending ↔ done`; toggling to pending clears `completedAt`. Users cannot edit task content. Due dates remain fixed. A user may delete a task they created; admins/owners may delete any task.
+12. **Rules → admin-only full CRUD** (add + edit + delete). User view-only. **(User-confirmed corrects an earlier note that said "anyone can add.")**
+13. **Notes → anyone can add (user photographs + creates), admin-only edits, no delete in V1.** Notes retain the internal `item` page type to avoid a needless data migration.
 14. **Future-dated tasks → show in "Upcoming" section on Routines tab**, not on Today (until their date arrives).
 15. **i18n by default**, two layers: (A) UI strings locale-keyed via `react-i18next` from day one — all components use `t()`, English `en.json` active, a locale file placeholder drops in for V2. No switcher UI in V1. (B) User-content i18n is manual in V1 (`pages.localName`, optional `pages.localContent`); V2 adds auto-translation + per-content translations map for routines/tasks. See §6.10 (i18n).
-16. **Stable direct links and resolved wiki identity.** Canonical view routes are `/items/:id`, `/rules/:id`, `/tasks/:id`, `/routines/:id`, and `/shopping/:id`. Authors type `[[Page Title]]`, but mutations resolve successful references to `[[page:<id>|Display Label]]` before storage. Old title tokens and `/p/:slug` routes remain readable for compatibility; all new resolved links navigate by ID.
+16. **Stable direct links and resolved wiki identity.** Canonical view routes are `/notes/:id`, `/rules/:id`, `/tasks/:id`, `/routines/:id`, and `/shopping/:id`. Authors type `[[Page Title]]`, but mutations resolve successful references to `[[page:<id>|Display Label]]` before storage. Old `/items/:id`, title-token, and `/p/:slug` routes remain readable for compatibility; all new resolved links navigate by ID.
 17. **Wiki-link autocomplete uses two modes.** Passive suggestions inspect only the active trailing phrase and require a strong title match, so stale matches disappear as typing continues and replacement has an exact character range. Typing `[[` explicitly opens broad fuzzy item/rule search for intentional linking.
 18. **Completed rows remain visible through the day.** A completed task or bought shopping row stays in its current list as a checked row until the Singapore calendar date changes. The next day's date-scoped query removes it from the active list without deleting history.
 19. **Completion controls use optimistic client updates.** Tapping a task or shopping checkbox updates all relevant cached list/detail results immediately; Convex then confirms the mutation or rolls the optimistic state back on failure.
 20. **Task creation is inline.** The Today list ends with an expandable add-task row, matching Shopping. Due date defaults to Today; its popover offers Today, Tomorrow, This weekend, Next week, and a calendar. No Inbox/project selector is shown.
 21. **Routine creation is section-scoped and inline.** Daily, Weekly, and Monthly sections are always visible. Admins add from the final row of a section, which fixes the new routine's frequency to that section and saves it active by default. The inline creator and routine editor do not expose Wiki Page or Active controls.
-22. **Item creation is deliberately minimal.** The item form contains title and photo, with separate Upload photo and Take photo actions. Helper-language name and location are removed from authoring; existing stored values remain preserved and readable.
+22. **Note creation is deliberately minimal.** The note form contains title and optional photo, with separate Upload photo and Take photo actions. Local-language name and location are removed from authoring; existing stored values remain preserved and readable.
 23. **Completion checkboxes stay on day/task surfaces.** Routine detail represents the reusable template and therefore has no checkbox; routine completion happens in the dated task lists. One-off task detail keeps the same check circle as its list row. One-off tasks expose a three-dot delete menu to their creator or a family admin/owner, backed by the same server check.
-24. **Routine and one-off task details use inline editing.** Admins/owners edit routine and task title/note by tapping the text; helpers see read-only content. The one-off task delete action appears in an anchored popover and still requires confirmation.
+24. **Routine and one-off task details use inline editing.** Admins/owners edit routine and task title/note by tapping the text; users see read-only content. Routine and one-off task deletion appears in an anchored popover and requires confirmation; deleting a routine cascades to its completion history.
 25. **Inline editing is the default for displayed text fields.** Editable titles, notes/content, and the family name enter an in-place editor when tapped, save on blur/Enter, and cancel on Escape. Creation remains form-based; photos, schedules, roles, dates, and rule settings remain purpose-built controls.
 26. **Shopping detail mirrors task detail.** Bought state uses the same leading check control as tasks. A shopping row can be hard-deleted by the member who added it or by a family admin/owner, with matching UI visibility and server enforcement.
+27. **Versioning and releases use Release Please.** Conventional commits on `main` maintain a release pull request that updates the Node package version and changelog; merging it creates the corresponding Git tag and GitHub release.
+28. **Reopened family invites are navigation, not another join prompt.** If the authenticated person already belongs to the invited family, opening its invite switches that family to active and redirects directly to the app. New members still see the explicit join screen.
 
 ## 11. Still Open
 
-- **Helper-created item quality** — items the helper adds go live immediately without admin review. If low-quality items become a problem, V2 adds an approval queue. Decide by observation post-launch.
+- **User-created note quality** — notes a user adds go live immediately without admin review. If low-quality notes become a problem, V2 adds an approval queue. Decide by observation post-launch.
 - **Rules deletion softening** — V1 hard-deletes rules (admin-only). If you want a soft-delete (rule hidden but recoverable) for accidentally-removed rules, tell me before Phase 3.
 - **`routines`/`tasks` content translation** — V1 keeps titles as plain English strings. The V2 migration to a locale-keyed `titleI18n` map is mechanical but should land alongside the auto-translation provider so the field isn't half-empty.
 
@@ -602,14 +604,14 @@ Each phase ends with something you can open and tap. No phase ships a half-featu
 
 ## 12. Definition of Done (V1)
 
-- [ ] Helper can log in (own password) and see Today's checklist (routines + tasks due today)
+- [ ] User can log in (own password) and see Today's checklist (routines + tasks due today)
 - [ ] Tap a routine row → opens its linked wiki page with photo + local + `[[links]]`
 - [ ] Tap the check-circle → routine or task remains visibly done for today and clears from the active day view tomorrow
-- [ ] Both users can create an item with a photo from the phone camera
+- [ ] Both users can create a note with an optional photo from the phone camera
 - [ ] `[[Links]]` resolve when target exists; show as broken (dashed) when it doesn't
 - [ ] Typing a task or routine title suggests matching items/rules; selecting a result inserts a working inline `[[link]]`
 - [ ] Typing a shopping item suggests matching items/rules; selected references render as working inline `[[links]]`
-- [ ] Every item, rule, task, routine, and shopping row has a stable direct URL that survives title changes and can be shared
+- [ ] Every note, rule, task, routine, and shopping row has a stable direct URL that survives title changes and can be shared
 - [ ] Weekly + monthly routines appear on the correct day automatically
 - [ ] Both users can add shopping items; pending items stay until bought; both phones sync in real time
 - [ ] Shopping detail uses the task-style checkbox; creators/admins/owners can delete a shopping row
@@ -617,9 +619,10 @@ Each phase ends with something you can open and tap. No phase ships a half-featu
 - [ ] One-off tasks can be added and toggled done/not done by either user; admins/owners can edit title/note; creators/admins/owners can delete
 - [ ] Future-dated tasks appear in the "Upcoming" section on the Routines tab
 - [ ] Pinned rules surface as the warning callout at the top of Today
-- [ ] Rules: admin-only add/edit/delete; helper cannot author rules (mutations reject; UI hides controls)
-- [ ] Items: anyone can create, admin-only edits, no one deletes in V1
-- [ ] Search (modal) finds items, rules, and tasks; offers to create a new item if no match
+- [ ] Rules: admin-only add/edit/delete; user cannot author rules (mutations reject; UI hides controls)
+- [ ] Notes: anyone can create, admin-only edits, no one deletes in V1; catalog is a responsive photo grid
+- [ ] Routines: admin/owner can delete with confirmation; completion history is deleted with the routine
+- [ ] Search (modal) finds notes, rules, and tasks; offers to create a new note
 - [ ] All UI strings routed through `react-i18next` `t()`; no hard-coded English in components; a locale file placeholder exists
 - [ ] All screens meet DESIGN.md tokens, contrast, and the no-nested-containers rule
 - [ ] Passes `prefers-reduced-motion` and tap-target ≥44px checks

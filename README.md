@@ -1,7 +1,7 @@
 # Bluetape
 
 Bluetape is a household coordination app for routines, one-off tasks, household
-items, rules, and a shared shopping list. Records can reference items and rules
+notes, rules, and a shared shopping list. Records can reference notes and rules
 with wiki-style links.
 
 ## Stack
@@ -35,6 +35,14 @@ npm run check:i18n
 npm run build
 npm run lint
 ```
+
+## Versioning and releases
+
+Pushes to `main` run Release Please. Conventional commits update an automated
+release pull request with the next semantic version and `CHANGELOG.md`; merging
+that pull request creates the matching Git tag and GitHub release. Use `feat:`
+for minor releases, `fix:` for patch releases, and a breaking-change footer for
+major releases.
 
 ## Project documentation
 

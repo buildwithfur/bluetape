@@ -22,7 +22,7 @@ async function setupProfile(options?: { enabled?: boolean; locale?: string }) {
     await ctx.db.insert('familyMembers', {
       familyId,
       userId,
-      role: 'helper',
+      role: 'user',
       displayName: 'Helper',
       joinedAt: 1,
     })

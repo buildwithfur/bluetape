@@ -13,7 +13,7 @@ const localeValidator = v.union(
  * longer be self-assigned at profile creation. This closes the
  * privilege-escalation hole: a user signs up, gets a profile with no
  * role, then either creates a family (becomes owner → admin) or joins
- * one via invite (becomes helper; owner may promote).
+ * one via invite (becomes a user; owner may promote).
  */
 export const getMe = query({
   args: {},

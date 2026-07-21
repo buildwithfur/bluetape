@@ -12,6 +12,7 @@ import { Markdown } from '@/components/Markdown'
 import { Button } from '@/components/Button'
 import { BottomSheet } from '@/components/BottomSheet'
 import { ShareButton } from '@/components/ShareButton'
+import { WikiLinkSuggestions } from '@/components/WikiLinkSuggestions'
 import { OverflowMenu } from '@/components/OverflowMenu'
 import { PhotoCapture } from '@/components/PhotoCapture'
 import {
@@ -46,6 +47,8 @@ export default function PageView({ recordType }: { recordType?: PageType }) {
   const generateUploadUrl = useGenerateUploadUrl()
   const deleteRule = useDeleteRule()
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState(false)
   const [, setCopied] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
   const [editingContent, setEditingContent] = useState(false)
@@ -311,22 +314,27 @@ export default function PageView({ recordType }: { recordType?: PageType }) {
 
         <div className="page-px pb-6 pt-3">
           {editingContent ? (
-            <textarea
-              ref={contentInputRef}
-              value={contentDraft}
-              onChange={(event) => setContentDraft(event.target.value)}
-              onBlur={() => void saveContent()}
-              onKeyDown={(event) => {
-                if (event.key === 'Escape') {
-                  setContentDraft(authoringContent)
-                  setSaveError(false)
-                  setEditingContent(false)
-                }
-              }}
-              rows={8}
-              aria-label={t('page.field.content')}
-              className="min-h-40 w-full resize-y rounded-xs border border-accent bg-surface px-3 py-2 text-[17px] leading-[1.6] text-text-primary outline-none ring-2 ring-accent/20"
-            />
+            <div>
+              <textarea
+                ref={contentInputRef}
+                value={contentDraft}
+                onChange={(event) => setContentDraft(event.target.value)}
+                onBlur={() => void saveContent()}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    setContentDraft(authoringContent)
+                    setSaveError(false)
+                    setEditingContent(false)
+                  }
+                }}
+                rows={8}
+                aria-label={t('page.field.content')}
+                className="min-h-40 w-full resize-y rounded-xs border border-accent bg-surface px-3 py-2 text-[17px] leading-[1.6] text-text-primary outline-none ring-2 ring-accent/20"
+              />
+              <div className="mt-1">
+                <WikiLinkSuggestions value={contentDraft} onChange={setContentDraft} />
+              </div>
+            </div>
           ) : isAdmin ? (
             <div
               role="button"
@@ -381,19 +389,37 @@ export default function PageView({ recordType }: { recordType?: PageType }) {
       {/* Delete confirmation */}
       <BottomSheet
         open={confirmDelete}
-        onClose={() => setConfirmDelete(false)}
+        onClose={() => {
+          setConfirmDelete(false)
+          setDeleteError(false)
+        }}
         title={t('action.delete')}
         footer={
           <>
-            <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setConfirmDelete(false)
+                setDeleteError(false)
+              }}
+            >
               {t('action.cancel')}
             </Button>
             <Button
-              variant="primary"
+              variant="danger"
+              disabled={deleting}
               onClick={async () => {
-                if (!isAdmin || !isRule) return
-                await deleteRule(page._id)
-                navigate('/more/rules')
+                if (!isAdmin || !isRule || deleting) return
+                setDeleting(true)
+                setDeleteError(false)
+                try {
+                  await deleteRule(page._id)
+                  navigate('/more/rules', { replace: true })
+                } catch {
+                  setDeleteError(true)
+                } finally {
+                  setDeleting(false)
+                }
               }}
             >
               {t('action.delete')}
@@ -401,7 +427,14 @@ export default function PageView({ recordType }: { recordType?: PageType }) {
           </>
         }
       >
-        {t('common.confirmDeleteRule')}
+        <div className="space-y-3">
+          <p>{t('common.confirmDeleteRule')}</p>
+          {deleteError && (
+            <p role="alert" className="text-sm text-error-accent">
+              {t('common.deleteRuleFailed')}
+            </p>
+          )}
+        </div>
       </BottomSheet>
     </>
   )
