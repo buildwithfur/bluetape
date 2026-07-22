@@ -48,7 +48,7 @@ function RoutineRow({
       subtitle={
         routine.description ? (
           <span className="block">
-            <Markdown content={routine.description} />
+            <Markdown content={routine.description} inline />
           </span>
         ) : undefined
       }

@@ -15,9 +15,7 @@ export default function Items() {
   return (
     <>
       <TopBar
-        title={t('more.items')}
-        back
-        backOnDesktop={false}
+        title={t('nav.notes')}
       />
       {!items ? (
         <EmptyState>{t('common.loading')}</EmptyState>

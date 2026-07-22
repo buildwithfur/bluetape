@@ -11,7 +11,7 @@ import {
   useAllPages,
 } from '@/data/hooks'
 import type { Frequency } from '@/types'
-import { weekdayName } from '@/lib/date'
+import { WEEKDAYS_MONDAY_FIRST, weekdayName } from '@/lib/date'
 import { WikiLinkSuggestions } from '@/components/WikiLinkSuggestions'
 import { wikiAuthoringText } from '@/lib/wiki'
 
@@ -133,19 +133,19 @@ export default function RoutineEdit() {
             <fieldset>
               <legend className="label-caps text-text-tertiary mb-2">{t('routine.field.dayOfWeek')}</legend>
               <div className="flex flex-wrap gap-1.5">
-                {Array.from({ length: 7 }, (_, i) => weekdayName(i, 'short')).map((d, i) => (
+                {WEEKDAYS_MONDAY_FIRST.map((dayOfWeekValue) => (
                   <button
-                    key={d}
+                    key={dayOfWeekValue}
                     type="button"
-                    onClick={() => setDayOfWeek(i)}
+                    onClick={() => setDayOfWeek(dayOfWeekValue)}
                     className={
                       'h-10 w-10 rounded-xs border text-sm transition-colors ' +
-                      (dayOfWeek === i
+                      (dayOfWeek === dayOfWeekValue
                         ? 'border-accent bg-accent-bg text-accent font-medium'
                         : 'border-border-line text-text-secondary hover:bg-surface-hover')
                     }
                   >
-                    {d}
+                    {weekdayName(dayOfWeekValue, 'short')}
                   </button>
                 ))}
               </div>

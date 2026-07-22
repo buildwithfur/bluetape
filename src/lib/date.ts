@@ -9,6 +9,9 @@ import i18n from '@/i18n'
 
 export const SG_TZ = 'Asia/Singapore'
 
+/** Calendar weekday values in the order used by household schedules. */
+export const WEEKDAYS_MONDAY_FIRST = [1, 2, 3, 4, 5, 6, 0] as const
+
 /** Format an instant (ms UTC) as an SG local string. */
 export function formatInSG(
   instantMs: number,

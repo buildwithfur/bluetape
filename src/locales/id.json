@@ -1,6 +1,7 @@
 {
   "app.name": "Bluetape",
   "nav.today": "Tugas",
+  "nav.notes": "Catatan",
   "nav.routines": "Rutinitas",
   "nav.recipes": "Resep",
   "nav.shopping": "Belanja",
@@ -160,6 +161,7 @@
   "more.items": "Catatan",
   "more.rulesHint": "Kebijakan rumah tangga.",
   "more.itemsHint": "Informasi umum rumah tangga.",
+  "more.routinesHint": "Jadwal rumah tangga berulang.",
   "more.family": "Keluarga",
   "more.familyHint": "Anggota, tautan undangan, dan peran.",
   "more.version": "Versi {{version}}",
