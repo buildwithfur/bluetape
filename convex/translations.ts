@@ -393,7 +393,8 @@ export const getActivity = query({
     const familyId = profile.currentFamilyId;
     assertSupportedLocale(profile.locale);
     await requireFamilyMember(ctx, familyId);
-    const rows = await ctx.db
+    const now = Date.now();
+    const pending = await ctx.db
       .query("contentTranslations")
       .withIndex("by_locale_status", (q) =>
         q
@@ -401,9 +402,11 @@ export const getActivity = query({
           .eq("targetLocale", profile.locale)
           .eq("status", "pending"),
       )
-      .filter((q) => q.gt(q.field("leaseExpiresAt"), Date.now()))
-      .take(1);
-    return { enabled: true, pending: rows.length > 0 };
+      .take(10);
+    const hasActive = pending.some(
+      (row) => (row as { leaseExpiresAt: number }).leaseExpiresAt > now,
+    );
+    return { enabled: true, pending: hasActive };
   },
 });
 
