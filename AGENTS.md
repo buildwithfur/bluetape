@@ -48,6 +48,7 @@ Bluetape is a household coordination web app — household users in Singapore co
 - Never use destructive git commands (`git push --force`, `git reset --hard` to a remote ref, `git clean -fd`, etc.) unless explicitly asked.
 - Do not commit unless the user asks for a commit.
 - Do not amend commits unless the user explicitly asks for it.
+- When committing, use [Conventional Commits](https://www.conventionalcommits.org/) so release-please can determine the release type and generate release notes. Use `feat:` for user-facing features (minor release), `fix:` for bug fixes (patch release), and add `!` or a `BREAKING CHANGE:` footer for breaking changes (major release). Use an appropriate scope when it adds clarity, e.g. `fix(shopping): preserve pending items`.
 
 ## Design System
 
