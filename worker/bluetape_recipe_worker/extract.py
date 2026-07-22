@@ -124,7 +124,7 @@ class SourceAccess:
             if (
                 self.using_proxy
                 or not self.proxy_url
-                or not _should_retry_with_proxy(direct_error)
+                or not _should_retry_fetch_with_proxy(direct_error)
             ):
                 raise _redact_proxy_error(direct_error, self.proxy_url) from direct_error
             self.using_proxy = True
@@ -163,6 +163,11 @@ def _should_retry_with_proxy(error: ExtractionError) -> bool:
         "confirm you\u2019re not a bot",
         "confirm you're not a bot",
     ))
+
+
+def _should_retry_fetch_with_proxy(error: ExtractionError) -> bool:
+    """A direct website connection failure is eligible for one proxy retry."""
+    return error.code == "source_unavailable" or _should_retry_with_proxy(error)
 
 
 def _gallery_error(error: ExtractionError) -> ExtractionError:
@@ -239,7 +244,10 @@ def _safe_fetch(
     except ExtractionError:
         raise
     except httpx.HTTPError as exc:
-        raise ExtractionError("source_unavailable", "Source request failed") from exc
+        raise ExtractionError(
+            "source_unavailable",
+            f"{type(exc).__name__}: {exc}",
+        ) from exc
     raise ExtractionError("too_many_redirects", "Source redirected too many times")
 
 

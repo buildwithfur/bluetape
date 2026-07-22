@@ -473,3 +473,23 @@ def test_non_blocking_ytdlp_failure_does_not_enable_proxy(
     assert len(commands) == 1
     assert "--proxy" not in commands[0]
     assert access.using_proxy is False
+
+
+def test_website_network_failure_retries_once_through_proxy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str | None] = []
+    response = SimpleNamespace(status_code=200, text="recipe page")
+
+    def fake_fetch(_url, **kwargs):
+        calls.append(kwargs["proxy"])
+        if len(calls) == 1:
+            raise ExtractionError("source_unavailable", "ConnectTimeout: timed out")
+        return response
+
+    monkeypatch.setattr(extract, "_safe_fetch", fake_fetch)
+    access = SourceAccess("http://user__sessid.job:secret@gw.dataimpulse.com:823")
+
+    assert access.fetch("https://example.com/recipe") is response
+    assert calls == [None, access.proxy_url]
+    assert access.using_proxy is True
