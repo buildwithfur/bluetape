@@ -65,8 +65,8 @@ export const create = mutation({
  * safe to call repeatedly while the client settles after authentication.
  */
 export const ensure = mutation({
-  args: {},
-  handler: async (ctx) => {
+  args: { locale: v.optional(localeValidator) },
+  handler: async (ctx, args) => {
     const userId = await requireUser(ctx);
     const existing = await ctx.db
       .query("userProfiles")
@@ -79,7 +79,7 @@ export const ensure = mutation({
     const profileId = await ctx.db.insert("userProfiles", {
       userId,
       displayName,
-      locale: "en",
+      locale: args.locale ?? "en",
       timezone: "Asia/Singapore",
       autoTranslateEnabled: false,
     });

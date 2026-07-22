@@ -218,6 +218,8 @@
   "login.createAccount": "Buat akun",
   "login.haveAccount": "Sudah punya akun?",
   "login.error": "Periksa email dan kata sandi Anda.",
+  "login.language": "Bahasa",
+  "login.languageMenu": "Pilih bahasa",
   "login.demoHint": "Demo — pilih peran untuk melihat pratinjau aplikasi.",
   "login.demoAdmin": "Masuk sebagai pemberi kerja (admin)",
   "login.demoUser": "Masuk sebagai pengguna",

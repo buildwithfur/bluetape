@@ -218,6 +218,8 @@
   "login.createAccount": "Create account",
   "login.haveAccount": "Already have an account?",
   "login.error": "Check your email and password.",
+  "login.language": "Language",
+  "login.languageMenu": "Choose language",
   "login.demoHint": "Demo — choose a role to preview the app.",
   "login.demoAdmin": "Enter as employer (admin)",
   "login.demoUser": "Enter as user",
