@@ -1,6 +1,7 @@
 {
   "app.name": "Bluetape",
   "nav.today": "Tasks",
+  "nav.notes": "Notes",
   "nav.routines": "Routines",
   "nav.recipes": "Recipes",
   "nav.shopping": "Shopping",
@@ -160,6 +161,7 @@
   "more.items": "Notes",
   "more.rulesHint": "Household policy.",
   "more.itemsHint": "General household information.",
+  "more.routinesHint": "Recurring household schedules.",
   "more.family": "Family",
   "more.familyHint": "Members, invite link, and roles.",
   "more.version": "Version {{version}}",

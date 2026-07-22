@@ -22,23 +22,29 @@ import { todayLabel } from '@/lib/date'
 import { useCurrentRole, useNavigationWarmup } from '@/data/hooks'
 import { useAuthActions } from '@convex-dev/auth/react'
 
-/** Per PLAN.md §6.9: 5-tab bottom bar on mobile (Tasks · Routines · Recipes · Shopping · More),
+/** Per PLAN.md §6.9: 5-tab bottom bar on mobile (Tasks · Notes · Recipes · Shopping · More),
  * left rail on desktop (≥768px). Search opens as a modal from the top bar — no tab. */
 const TABS = [
   { to: '/', icon: ListChecks, key: 'nav.today', exact: true },
-  { to: '/routines', icon: CalendarDots, key: 'nav.routines', exact: false },
+  { to: '/notes', icon: NoteBlank, key: 'nav.notes', exact: false },
   { to: '/recipes', icon: CookingPot, key: 'nav.recipes', exact: false },
   { to: '/shopping', icon: ShoppingCart, key: 'nav.shopping', exact: false },
-  { to: '/more', icon: DotsThreeOutline, key: 'nav.more', exact: false },
+  {
+    to: '/more',
+    icon: DotsThreeOutline,
+    key: 'nav.more',
+    exact: false,
+    activePaths: ['/routines'],
+  },
 ] as const
 
 const DESKTOP_TABS = [
   { to: '/', icon: ListChecks, key: 'nav.today', exact: true },
-  { to: '/routines', icon: CalendarDots, key: 'nav.routines', exact: false },
+  { to: '/notes', icon: NoteBlank, key: 'nav.notes', exact: false },
   { to: '/recipes', icon: CookingPot, key: 'nav.recipes', exact: false },
   { to: '/shopping', icon: ShoppingCart, key: 'nav.shopping', exact: false },
   { to: '/more/rules', icon: Scroll, key: 'more.rules', exact: false },
-  { to: '/more/notes', icon: NoteBlank, key: 'more.items', exact: false },
+  { to: '/routines', icon: CalendarDots, key: 'nav.routines', exact: false },
   { to: '/language', icon: Globe, key: 'settings.language', exact: false },
 ] as const
 
@@ -63,8 +69,9 @@ export function TabBar() {
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <ul className="grid grid-cols-5 h-14">
-        {TABS.map(({ to, icon: Icon, key, exact }) => {
+        {TABS.map(({ to, icon: Icon, key, exact, ...tab }) => {
           const active = isActive(pathname, to, exact)
+            || ('activePaths' in tab && tab.activePaths.some((path) => isActive(pathname, path)))
           return (
             <li key={to}>
               <Link

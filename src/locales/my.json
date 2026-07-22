@@ -1,6 +1,7 @@
 {
   "app.name": "Bluetape",
   "nav.today": "တာဝန်များ",
+  "nav.notes": "မှတ်စုများ",
   "nav.routines": "ပုံမှန်လုပ်ငန်းများ",
   "nav.recipes": "ချက်နည်းများ",
   "nav.shopping": "ဈေးဝယ်စာရင်း",
@@ -160,6 +161,7 @@
   "more.items": "မှတ်စုများ",
   "more.rulesHint": "အိမ်ထောင်စု စည်းမျဉ်းများ။",
   "more.itemsHint": "အိမ်ထောင်စုဆိုင်ရာ အထွေထွေ အချက်အလက်များ။",
+  "more.routinesHint": "ထပ်တလဲလဲ အိမ်ထောင်စု အချိန်ဇယားများ။",
   "more.family": "မိသားစု",
   "more.familyHint": "အဖွဲ့ဝင်များ၊ ဖိတ်ကြားလင့်ခ်နှင့် ရာထူးများ။",
   "more.version": "ဗားရှင်း {{version}}",

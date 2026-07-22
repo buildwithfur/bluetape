@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowUp, CalendarDots, Plus, X } from '@phosphor-icons/react'
 import { useSaveRoutine } from '@/data/hooks'
-import { weekdayName } from '@/lib/date'
+import { WEEKDAYS_MONDAY_FIRST, weekdayName } from '@/lib/date'
 import type { Frequency } from '@/types'
 import { cn } from '@/lib/cn'
 import { WikiLinkSuggestions } from './WikiLinkSuggestions'
@@ -102,20 +102,20 @@ export function InlineRoutineComposer({ frequency }: { frequency: Frequency }) {
           <fieldset className="mt-2">
             <legend className="sr-only">{t('routine.field.dayOfWeek')}</legend>
             <div className="flex justify-between gap-1">
-              {Array.from({ length: 7 }, (_, index) => weekdayName(index, 'short')).map((day, index) => (
+              {WEEKDAYS_MONDAY_FIRST.map((dayOfWeekValue) => (
                 <button
-                  key={day}
+                  key={dayOfWeekValue}
                   type="button"
-                  onClick={() => setDayOfWeek(index)}
-                  aria-pressed={dayOfWeek === index}
+                  onClick={() => setDayOfWeek(dayOfWeekValue)}
+                  aria-pressed={dayOfWeek === dayOfWeekValue}
                   className={cn(
                     'flex h-9 min-w-9 flex-1 items-center justify-center rounded-xs text-xs font-medium transition-colors',
-                    dayOfWeek === index
+                    dayOfWeek === dayOfWeekValue
                       ? 'bg-ink-700 text-text-on-accent'
                       : 'text-text-secondary hover:bg-surface-hover',
                   )}
                 >
-                  {day}
+                  {weekdayName(dayOfWeekValue, 'short')}
                 </button>
               ))}
             </div>

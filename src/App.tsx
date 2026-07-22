@@ -100,10 +100,11 @@ export default function App() {
             <Route path="/recipes/:id/edit" element={<RecipeEdit />} />
             <Route path="/shopping" element={<Shopping />} />
             <Route path="/shopping/:id" element={<ShoppingItemView />} />
+            <Route path="/notes" element={<Items />} />
             <Route path="/more" element={<More />} />
             <Route path="/more/rules" element={<Rules />} />
-            <Route path="/more/notes" element={<Items />} />
-            <Route path="/more/items" element={<Navigate to="/more/notes" replace />} />
+            <Route path="/more/notes" element={<Navigate to="/notes" replace />} />
+            <Route path="/more/items" element={<Navigate to="/notes" replace />} />
             <Route path="/family" element={<Family />} />
             <Route path="/language" element={<Settings />} />
             <Route path="/settings" element={<Navigate to="/language" replace />} />

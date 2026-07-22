@@ -14,7 +14,7 @@ export default function More() {
 
   const entries = [
     { to: '/more/rules', label: t('more.rules'), hint: t('more.rulesHint') },
-    { to: '/more/notes', label: t('more.items'), hint: t('more.itemsHint') },
+    { to: '/routines', label: t('nav.routines'), hint: t('more.routinesHint') },
     ...(role === 'owner' || role === 'admin'
       ? [{ to: '/family', label: t('more.family'), hint: t('more.familyHint') }]
       : []),

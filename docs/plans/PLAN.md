@@ -131,7 +131,7 @@ Index `isActive, frequency`.
 ```
 Index `status, dueDate`.
 
-**Lifecycle:** admins/owners can edit the title/note; any family member can toggle completion between `pending` and `done`. Toggling back clears `completedAt`. Due dates remain fixed after creation. The task creator or a family admin/owner can hard-delete a one-off task. Tasks with no `dueDate` or `dueDate === today` surface on Today; future-dated tasks live in the "Upcoming" section on the Routines tab (§6.4) until their date arrives.
+**Lifecycle:** admins/owners can edit the title/note; any family member can toggle completion between `pending` and `done`. Toggling back clears `completedAt`. Due dates remain fixed after creation. The task creator or a family admin/owner can hard-delete a one-off task. Tasks with no `dueDate` or `dueDate === today` surface on Today; future-dated tasks live in the "Upcoming" section on the Routines screen (§6.4) until their date arrives.
 
 ### `groceryItems` — simple shopping list (no daily reset)
 ```ts
@@ -211,7 +211,7 @@ A Convex query `today:list` returns the dashboard for a given date `YYYY-MM-DD`:
 2. **Routine done state:** for each due routine, look up `routineCompletions` for `routineId + date === today`. Present → done.
 3. **One-off tasks due today:** pending tasks due on that date (plus undated tasks on the actual Today view), together with matching tasks completed on the current Singapore date so they remain visibly checked until tomorrow.
 4. **Rule reminders for today:** pages where `type === "rule"` AND `pinnedToToday === true`. (A `pinnedToToday: boolean` flag on rule pages — set by admin. Simple, no rule↔routine linking needed in V1.)
-5. **Tasks with future due dates do NOT appear on Today.** They appear in the "Upcoming" section of the Routines tab (§6.4) until their date arrives.
+5. **Tasks with future due dates do NOT appear on Today.** They appear in the "Upcoming" section of the Routines screen (§6.4) until their date arrives.
 
 The query is reactive — marking a routine done updates the dashboard instantly on both phones.
 
@@ -225,7 +225,7 @@ The query is reactive — marking a routine done updates the dashboard instantly
 
 ### 5.3 Upcoming tasks computation
 
-`routines:upcoming()` returns tasks where `status === "pending"` AND `dueDate > today`, sorted by `dueDate` asc. Shown on the Routines tab under an "Upcoming" section header (§6.4). Surfaces future-dated one-off work in the place the user already looks for scheduled work.
+`routines:upcoming()` returns tasks where `status === "pending"` AND `dueDate > today`, sorted by `dueDate` asc. Shown on the Routines screen under an "Upcoming" section header (§6.4). Surfaces future-dated one-off work in the place the user already looks for scheduled work.
 
 ---
 
@@ -272,7 +272,7 @@ Today's checklist                  ← label-caps, tertiary
 - Pull to refresh: re-reads "today" (handles the case of opening past midnight)
 - Empty state keeps the inline add-task row visible so either user can immediately create a task
 
-**What is NOT on Today:** shopping list (lives on its own Shopping tab), routine templates (Routines tab), the note/rule catalog (More tab). Today is purely the day's checklist + pinned rule callout.
+**What is NOT on Today:** shopping list (Shopping tab), routine templates and the rule catalog (More), or the note catalog (Notes tab). Today is purely the day's checklist + pinned rule callout.
 
 ### 6.2 Note / Rule View — `/notes/:id` and `/rules/:id`
 (Already prototyped — see `prototype/page.html`.)
@@ -298,12 +298,15 @@ Today's checklist                  ← label-caps, tertiary
 - Sticky bottom bar: Cancel (ghost) · Save (primary). Save disabled while empty title.
 
 ### 6.4 Routines — `/routines`
-**Permissions:** users can **view** this tab (tap into routines, follow inline `[[links]]`), but **cannot create/edit/delete**. Only admins manage the recurring schedule. Inline add rows and edit affordances are hidden for users; rows are tappable (read details) but not editable.
+**Entry point:** Routines is reached from More rather than occupying a primary tab.
+
+**Permissions:** users can **view** this screen (tap into routines, follow inline `[[links]]`), but **cannot create/edit/delete**. Only admins manage the recurring schedule. Inline add rows and edit affordances are hidden for users; rows are tappable (read details) but not editable.
 
 **Layout:**
 - Daily / Weekly / Monthly groups are always visible, each with a `label-caps` section header
+- Weekly routines are grouped under localized Monday-through-Sunday subheadings; empty days are omitted
 - **Upcoming tasks section** — one-off tasks with `dueDate > today` (status pending), sorted by due date asc, shown beneath the routines. This is where future-dated tasks live until their date arrives on Today.
-- Each routine row: title and frequency detail ("every Monday" / "1st of month")
+- Each routine row: title and frequency detail for daily/monthly entries; weekly entries inherit their weekday subheading
 - Tap row → detail (`/routines/:id`) for everyone; admin can continue to `/routines/:id/edit`
 - Each admin section ends with an inline add-routine row matching Tasks and Shopping:
   - Title plus optional note
@@ -324,18 +327,20 @@ Today's checklist                  ← label-caps, tertiary
 - Empty state: "Add what you need to buy."
 - Each row has a stable detail URL (`/shopping/:id`) for deep linking and sharing.
 
-### 6.6 More — `/more`
+### 6.6 Notes + More — `/notes` and `/more`
 **Permissions:** users can view both catalogs and **add notes** (users can photograph + create notes). **Rules are admin-only** add/edit/delete. **No delete on notes in V1.**
 
-- Two list entries, each opens a filtered catalog:
+- **Notes** is a primary tab containing a responsive photo grid of pages where `type === "item"`; both roles see `+ New note`, and user-created notes go live immediately (admin can refine).
+- **More** contains:
   - **Rules** → list of pages where `type === "rule"` — admin sees FAB + edit/delete affordances; users see a read-only list
-  - **Notes** → responsive photo grid of pages where `type === "item"` — both roles see `+ New note`; user-created notes go live immediately (admin can refine)
+  - **Routines** → recurring schedule; users view and admins/owners manage
+  - Family administration for admins/owners, language, and Sign out
 - The Notes grid uses cropped 4:3 thumbnails, lazy loading, and two/three/four columns across phone/tablet/desktop widths. Rules remain a hairline-divided list. Tap either kind → wiki page view (§6.2).
 - These catalogs exist so a rule/note is reachable by browsing as well as by `[[link]]`; they are not a wiki index
-- Also hosts **Sign out** (a row here — simplest, no settings chrome needed)
+- More also hosts **Sign out** (a row here — simplest, no settings chrome needed)
 
 ### 6.7 Search — modal command palette (no tab)
-**Scope:** searches **notes, rules, recipes, and one-off tasks**. Does **not** search routines (those are admin-managed on their own tab and users don't need to find them by text). Triggered from the search icon in the top bar.
+**Scope:** searches **notes, rules, recipes, and one-off tasks**. Does **not** search routines (those are managed on the dedicated schedule screen and users don't need to find them by text). Triggered from the search icon in the top bar.
 
 - V1: client-side filter over reactive loaded lists (pages of type item/rule + recipes + tasks)
 - Results grouped by kind: Notes / Rules / Recipes / Tasks
@@ -351,12 +356,12 @@ Today's checklist                  ← label-caps, tertiary
 - The `users` table is managed by `@convex-dev/auth`; our app-level fields (role, locale, displayName) live in a parallel `userProfiles` table keyed by the auth user ID, so we don't fight the auth provider's schema
 
 ### 6.9 App shell
-- **Bottom tab bar: Tasks · Routines · Recipes · Shopping · More** (5 tabs)
+- **Bottom tab bar: Tasks · Notes · Recipes · Shopping · More** (5 tabs)
   - `Tasks` — the daily checklist (routines + tasks due today, check-off)
-  - `Routines` — recurring schedule (user view-only, admin manages) + Upcoming tasks section
+  - `Notes` — household reference photo grid; anyone can add
   - `Recipes` — structured family recipes plus the paste-link import entry point
   - `Shopping` — shared realtime list (both add/check)
-  - `More` — Rules (admin-only) + Notes (anyone-add) catalogs + Sign out
+  - `More` — Rules, Routines, family/language controls, and Sign out
 - **No Search tab** — search opens as a modal from a top-bar icon
 - Sticky top bar with contextual title + actions per route (search icon always present)
 - On desktop (≥768px): left rail replaces bottom bar; content max-width 480px centered (keeps the editorial phone feel)
@@ -390,7 +395,7 @@ Two roles: **admin** and **user** (primary daily role), with the family creator 
 |---|---|---|---|---|
 | Today checklist | ✓ | one-off tasks | mark routines/tasks done | ✗ |
 | Routine completion | ✓ | — | ✓ both can mark a routine done for today | ✗ |
-| Routines tab (templates) | ✓ | ✗ | ✗ admin-only | ✗ admin/owner-only |
+| Routines screen (templates) | ✓ | ✗ | ✗ admin-only | ✗ admin/owner-only |
 | **Rules** (wiki pages) | ✓ | ✗ **admin-only** | ✗ **admin-only** | ✗ **admin-only** |
 | Notes (wiki pages, photos) | ✓ | ✓ anyone | ✗ admin-only | ✗ never in V1 |
 | Shopping list | ✓ | ✓ both | ✓ both can mark bought | creator/admin/owner |
@@ -594,8 +599,8 @@ Each phase ends with something you can open and tap. No phase ships a half-featu
 2. **Timezone → Asia/Singapore, computed client-side.** Instants stored as Unix timestamps (UTC ms); calendar dates stored as `YYYY-MM-DD` strings; "today" computed on the client in SG, sent to queries. Full model in §4.
 3. **Hosting → Convex + Cloudflare Pages, auto-deploy on push to `main` via GitHub integration.**
 4. **No Pages index / wiki-app surface.** Wiki links are a *feature* (inline `[[...]]` inside tasks, routines, notes, rules, shopping, and recipes), not the product. Valid targets are notes, rules, and recipes. Records are reached through their product surface, by link, or by Search; there is no generic Pages tab.
-5. **Tab bar → 5 tabs: Tasks · Routines · Recipes · Shopping · More.** Recipes and Shopping are first-class tabs. Search opens as a modal command palette from the top bar, not a tab.
-6. **Today is a flat unified checklist** — recurring routines due today + one-off tasks due today, same checkable-row treatment. No Morning/Afternoon sections. No standalone task index; individual tasks do have `/tasks/:id` detail URLs. Tasks without a due date also surface on Today, future-dated tasks don't (they live in Routines tab's "Upcoming" section).
+5. **Tab bar → 5 tabs: Tasks · Notes · Recipes · Shopping · More.** Notes, Recipes, and Shopping are first-class tabs. Routines moves into More. Search opens as a modal command palette from the top bar, not a tab.
+6. **Today is a flat unified checklist** — recurring routines due today + one-off tasks due today, same checkable-row treatment. No Morning/Afternoon sections. No standalone task index; individual tasks do have `/tasks/:id` detail URLs. Tasks without a due date also surface on Today, future-dated tasks don't (they live in the Routines screen's "Upcoming" section).
 7. **Shopping label** = "Shopping" in the UI (table stays `groceryItems`).
 8. **No settings screen in V1.** Sign-out lives in the More tab.
 9. **Search scope → notes + rules + recipes + tasks.** Routines excluded.
@@ -603,14 +608,14 @@ Each phase ends with something you can open and tap. No phase ships a half-featu
 11. **Tasks → admin/owner title-note editing; completion is reversible; deletion is creator/admin/owner-only.** Any family member can toggle `pending ↔ done`; toggling to pending clears `completedAt`. Users cannot edit task content. Due dates remain fixed. A user may delete a task they created; admins/owners may delete any task.
 12. **Rules → admin-only full CRUD** (add + edit + delete). User view-only. **(User-confirmed corrects an earlier note that said "anyone can add.")**
 13. **Notes → anyone can add (user photographs + creates), admin-only edits, no delete in V1.** Notes retain the internal `item` page type to avoid a needless data migration.
-14. **Future-dated tasks → show in "Upcoming" section on Routines tab**, not on Today (until their date arrives).
+14. **Future-dated tasks → show in "Upcoming" section on the Routines screen**, not on Today (until their date arrives).
 15. **i18n has separate UI and user-content layers.** UI strings ship through `react-i18next` in English, Indonesian, and Burmese. Supported user-content fields use an operator-gated, on-demand `contentTranslations` cache keyed by exact source hash and viewer locale; authored source remains authoritative and visible as the fallback. Tasks are the first merged entity and recipes reuse that lifecycle for title, ingredients, and steps. See §6.10.
 16. **Stable direct links and resolved wiki identity.** Canonical view routes are `/notes/:id`, `/rules/:id`, `/tasks/:id`, `/routines/:id`, `/shopping/:id`, and `/recipes/:id`. Authors type `[[Record Title]]`, but mutations resolve successful references to canonical page or recipe identities before storage. Old `/items/:id`, title-token, and `/p/:slug` routes remain readable for compatibility; all new resolved links navigate by ID.
 17. **Wiki-link autocomplete uses two modes.** Passive suggestions inspect only the active trailing phrase and require a strong title match, so stale matches disappear as typing continues and replacement has an exact character range. Typing `[[` explicitly opens broad fuzzy note/rule/recipe search for intentional linking. Type labels disambiguate title collisions.
 18. **Completed rows remain visible through the day.** A completed task or bought shopping row stays in its current list as a checked row until the Singapore calendar date changes. The next day's date-scoped query removes it from the active list without deleting history.
 19. **Completion controls use optimistic client updates.** Tapping a task or shopping checkbox updates all relevant cached list/detail results immediately; Convex then confirms the mutation or rolls the optimistic state back on failure.
 20. **Task creation is inline.** The Today list ends with an expandable add-task row, matching Shopping. Due date defaults to Today; its popover offers Today, Tomorrow, This weekend, Next week, and a calendar. No Inbox/project selector is shown.
-21. **Routine creation is section-scoped and inline.** Daily, Weekly, and Monthly sections are always visible. Admins add from the final row of a section, which fixes the new routine's frequency to that section and saves it active by default. The inline creator and routine editor do not expose Wiki Page or Active controls.
+21. **Routine creation is section-scoped and inline.** Daily, Weekly, and Monthly sections are always visible; weekly entries are grouped Monday through Sunday. Admins add from the final row of a section, which fixes the new routine's frequency to that section and saves it active by default. The inline creator and routine editor do not expose Wiki Page or Active controls.
 22. **Note creation is deliberately minimal.** The note form contains title and optional photo, with separate Upload photo and Take photo actions. Local-language name and location are removed from authoring; existing stored values remain preserved and readable.
 23. **Completion checkboxes stay on day/task surfaces.** Routine detail represents the reusable template and therefore has no checkbox; routine completion happens in the dated task lists. One-off task detail keeps the same check circle as its list row. One-off tasks expose a three-dot delete menu to their creator or a family admin/owner, backed by the same server check.
 24. **Routine and one-off task details use inline editing.** Admins/owners edit routine and task title/note by tapping the text; users see read-only content. Routine and one-off task deletion appears in an anchored popover and requires confirmation; deleting a routine cascades to its completion history.
@@ -647,7 +652,7 @@ Each phase ends with something you can open and tap. No phase ships a half-featu
 - [ ] Shopping detail uses the task-style checkbox; creators/admins/owners can delete a shopping row
 - [ ] Bought shopping items remain visibly checked today, leave the active list tomorrow, and persist in history
 - [ ] One-off tasks can be added and toggled done/not done by either user; admins/owners can edit title/note; creators/admins/owners can delete
-- [ ] Future-dated tasks appear in the "Upcoming" section on the Routines tab
+- [ ] Future-dated tasks appear in the "Upcoming" section on the Routines screen
 - [ ] Pinned rules surface as the warning callout at the top of Today
 - [ ] Rules: admin-only add/edit/delete; user cannot author rules (mutations reject; UI hides controls)
 - [ ] Notes: anyone can create, admin-only edits, no one deletes in V1; catalog is a responsive photo grid

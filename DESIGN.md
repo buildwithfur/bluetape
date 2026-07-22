@@ -238,7 +238,7 @@ Typography is bilingual: **Satoshi** (geometric grotesque, via Fontshare) for En
 
 Mobile-first. The primary surface is a phone screen, max-width 420px, centered on desktop with a hairline frame. The employer's occasional desktop use renders the same content with a left rail replacing the bottom tab bar.
 
-A **bottom tab bar** carries 5 destinations (Tasks, Routines, Recipes, Shopping, More) — thumb-reachable, iOS/Android muscle-memory. The active tab's icon and label render in `accent`; inactive tabs render in `text-tertiary`. The bar sits on `surface` with a `border-subtle` top hairline. Labels keep the 11px `label-caps` treatment and no extra horizontal padding so all five destinations remain legible at 320px.
+A **bottom tab bar** carries 5 destinations (Tasks, Notes, Recipes, Shopping, More) — thumb-reachable, iOS/Android muscle-memory. Routines lives inside More. The active tab's icon and label render in `accent`; inactive tabs render in `text-tertiary`. The bar sits on `surface` with a `border-subtle` top hairline. Labels keep the 11px `label-caps` treatment and no extra horizontal padding so all five destinations remain legible at 320px.
 
 A **sticky top bar** provides back navigation, contextual actions (Edit, overflow), and uses a translucent `background` with `backdrop-filter: blur(12px)` so content scrolls cleanly beneath.
 
