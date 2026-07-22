@@ -99,8 +99,20 @@ export function SearchPalette() {
         role="dialog"
         aria-modal="true"
         aria-label={t('search.title')}
+        onClick={(event) => {
+          if (event.target === event.currentTarget) setOpen(false)
+        }}
         className="absolute inset-0 w-full md:hidden"
       >
+        <button
+          type="button"
+          aria-label={t('action.close')}
+          onClick={() => setOpen(false)}
+          className="absolute right-3 top-[calc(max(7rem,16dvh)-3rem)] z-20 inline-flex h-10 w-10 items-center justify-center rounded-full bg-surface-floating text-ink shadow-[0_3px_12px_rgba(10,41,80,0.1)] hover:bg-surface-hover active:scale-95 transition"
+        >
+          <X size={20} aria-hidden="true" />
+        </button>
+
         <div className="absolute inset-x-0 bottom-0 top-[max(7rem,16dvh)] flex flex-col overflow-hidden rounded-t-lg border border-border-subtle bg-surface-floating shadow-[0_-4px_16px_rgba(10,41,80,0.05)]">
           <SearchResults {...resultProps} />
         </div>
@@ -114,14 +126,6 @@ export function SearchPalette() {
               placeholder={t('search.placeholder')}
               className="min-w-0 flex-1 bg-transparent text-[17px] text-text-primary placeholder:text-text-tertiary focus:outline-none"
             />
-            <button
-              type="button"
-              aria-label={t('action.close')}
-              onClick={() => setOpen(false)}
-              className="-mr-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-text-tertiary hover:bg-surface-active active:scale-95 transition"
-            >
-              <X size={20} aria-hidden="true" />
-            </button>
           </div>
         </div>
       </div>
