@@ -74,11 +74,10 @@ export function useLocalizedFields(fields: LocalizedField[]) {
 
   return {
     enabled,
-    /** The cache is still loading, so do not briefly paint authored text over a cached translation. */
+    /** The cache is still loading, but source text is shown immediately. */
     isLoading: enabled && refs.length > 0 && response === undefined,
     textFor(field: LocalizedField) {
       const result = results.get(fieldKey(field))
-      if (enabled && refs.length > 0 && response === undefined) return ''
       return result?.state === 'ready' && result.translatedText
         ? result.translatedText
         : field.source

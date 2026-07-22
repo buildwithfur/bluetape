@@ -1,6 +1,6 @@
 import { useConvexAuth } from '@convex-dev/auth/react'
 import { useQuery } from 'convex/react'
-import { Routes, Route, Navigate, Outlet } from 'react-router-dom'
+import { Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
 import { api } from '../convex/_generated/api'
 import { AppShell } from '@/components/AppShell'
@@ -61,6 +61,14 @@ function AppShellGuard() {
   )
 }
 
+/** Reset scroll to top on every route change so short pages don't inherit
+ *  the previous route's scroll offset. */
+function ScrollToTop() {
+  const { pathname } = useLocation()
+  useEffect(() => { window.scrollTo(0, 0) }, [pathname])
+  return null
+}
+
 export default function App() {
   const { isLoading: authLoading, isAuthenticated } = useConvexAuth()
   // Fetch profile only once authenticated, so getMe (which throws raw) never
@@ -84,6 +92,7 @@ export default function App() {
   return (
     <SearchProvider>
       <CreatePageProvider>
+        <ScrollToTop />
         <Routes>
           {/* Family bootstrap + invite happen before the app shell. */}
           <Route path="/invite/:token" element={<InviteAccept />} />
