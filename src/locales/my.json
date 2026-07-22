@@ -218,6 +218,8 @@
   "login.createAccount": "အကောင့် ဖန်တီးရန်",
   "login.haveAccount": "အကောင့်ရှိပြီးသားလား။",
   "login.error": "အီးမေးလ်နှင့် စကားဝှက်ကို စစ်ဆေးပါ။",
+  "login.language": "ဘာသာစကား",
+  "login.languageMenu": "ဘာသာစကား ရွေးပါ",
   "login.demoHint": "အစမ်းသုံးရန် ရာထူးတစ်ခု ရွေးပါ။",
   "login.demoAdmin": "အလုပ်ရှင် (စီမံသူ) အဖြစ် ဝင်ရန်",
   "login.demoUser": "အသုံးပြုသူအဖြစ် ဝင်ရန်",

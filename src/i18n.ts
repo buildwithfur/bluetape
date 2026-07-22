@@ -17,6 +17,18 @@ const resources = {
 export type { SupportedLocale } from '@convex/supportedLocales'
 export const supportedLocales = SUPPORTED_LOCALES
 
+const languageDetails: Record<SupportedLocale, { flag: string; nativeName: string }> = {
+  en: { flag: '🇬🇧', nativeName: 'English' },
+  my: { flag: '🇲🇲', nativeName: 'မြန်မာ' },
+  id: { flag: '🇮🇩', nativeName: 'Bahasa Indonesia' },
+}
+
+/** Supported UI locales, labelled in their own language for language pickers. */
+export const supportedLanguageOptions = supportedLocales.map((locale) => ({
+  locale,
+  ...languageDetails[locale],
+}))
+
 export function isSupportedLocale(locale: string): locale is SupportedLocale {
   return supportedLocales.includes(locale as SupportedLocale)
 }

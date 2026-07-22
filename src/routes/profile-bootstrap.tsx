@@ -3,6 +3,10 @@ import { useTranslation } from 'react-i18next'
 import { useEnsureProfile } from '@/data/hooks'
 import { Button } from '@/components/Button'
 import { TopBar } from '@/components/AppShell'
+import {
+  clearPendingProfileLocale,
+  getPendingProfileLocale,
+} from '@/lib/pending-profile-locale'
 
 /** First-login profile bootstrap.
  *
@@ -18,9 +22,12 @@ export function ProfileBootstrap() {
 
   useEffect(() => {
     setError(null)
-    void ensureProfile().catch((err: unknown) => {
-      setError(err instanceof Error ? err.message : String(err))
-    })
+    const locale = getPendingProfileLocale()
+    void ensureProfile(locale ? { locale } : {})
+      .then(() => clearPendingProfileLocale())
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : String(err))
+      })
   }, [attempt, ensureProfile])
 
   return (
