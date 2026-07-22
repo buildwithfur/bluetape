@@ -2,11 +2,13 @@ import { convexAuth } from "@convex-dev/auth/server";
 import { Email } from "@convex-dev/auth/providers/Email";
 import { Password } from "@convex-dev/auth/providers/Password";
 import Google from "@auth/core/providers/google";
-import { env } from "./_generated/server";
-import { getGoogleAuthCredentials } from "./lib/authSettings";
+import {
+  getAuthEmailSettings,
+  getGoogleAuthCredentials,
+  type AuthEmailSettings,
+} from "./lib/authSettings";
 
 const AUTH_CODE_MAX_AGE_SECONDS = 15 * 60;
-const DEFAULT_AUTH_EMAIL_FROM = "Bluetape <onboarding@resend.dev>";
 
 type AuthEmailPurpose = "verify" | "reset";
 
@@ -22,18 +24,17 @@ function generateSixDigitCode(): string {
   return String(values[0] % range).padStart(6, "0");
 }
 
-function authEmailProvider(id: string, purpose: AuthEmailPurpose) {
+function authEmailProvider(
+  id: string,
+  purpose: AuthEmailPurpose,
+  settings: AuthEmailSettings,
+) {
   return Email({
     id,
-    from: env.AUTH_EMAIL_FROM?.trim() || DEFAULT_AUTH_EMAIL_FROM,
+    from: settings.from,
     maxAge: AUTH_CODE_MAX_AGE_SECONDS,
     generateVerificationToken: async () => generateSixDigitCode(),
     async sendVerificationRequest({ identifier, token, provider }) {
-      const apiKey = env.AUTH_RESEND_KEY?.trim();
-      if (!apiKey) {
-        throw new Error("Authentication email delivery is not configured");
-      }
-
       const isVerification = purpose === "verify";
       const subject = isVerification
         ? "Verify your Bluetape email"
@@ -45,7 +46,7 @@ function authEmailProvider(id: string, purpose: AuthEmailPurpose) {
       const response = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${apiKey}`,
+          Authorization: `Bearer ${settings.apiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -66,14 +67,22 @@ function authEmailProvider(id: string, purpose: AuthEmailPurpose) {
       });
 
       if (!response.ok) {
-        throw new Error(`Authentication email delivery failed (${response.status})`);
+        const detail = (await response.text()).slice(0, 500);
+        throw new Error(
+          `Authentication email delivery failed (${response.status}): ${detail}`,
+        );
       }
     },
   });
 }
 
-const verifyEmail = authEmailProvider("password-verify", "verify");
-const resetPassword = authEmailProvider("password-reset", "reset");
+const emailSettings = getAuthEmailSettings();
+const verifyEmail = emailSettings
+  ? authEmailProvider("password-verify", "verify", emailSettings)
+  : undefined;
+const resetPassword = emailSettings
+  ? authEmailProvider("password-reset", "reset", emailSettings)
+  : undefined;
 const googleCredentials = getGoogleAuthCredentials();
 
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({

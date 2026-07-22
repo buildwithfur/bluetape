@@ -367,7 +367,7 @@ export default function Login() {
             </label>
           )}
 
-          {view === 'signIn' && (
+          {view === 'signIn' && authProviders?.passwordReset === true && (
             <button
               type="button"
               onClick={() => changeView('forgotPassword')}
