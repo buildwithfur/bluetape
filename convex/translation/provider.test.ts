@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_TRANSLATION_MODEL,
+  DEFAULT_TRANSLATION_REASONING_EFFORT,
   parseProviderResults,
   targetLanguageForLocale,
   targetLanguageTagForLocale,
+  translationReasoningEffort,
   TranslationProviderError,
 } from './provider'
 
@@ -15,6 +17,16 @@ const input = {
 }
 
 describe('translation provider response validation', () => {
+  it('validates the optional translation reasoning effort', () => {
+    expect(translationReasoningEffort(undefined)).toBe(
+      DEFAULT_TRANSLATION_REASONING_EFFORT,
+    )
+    expect(translationReasoningEffort(' LOW ')).toBe('low')
+    expect(() => translationReasoningEffort('disabled')).toThrow(
+      'provider_invalid_reasoning_effort',
+    )
+  })
+
   it('maps the app locale my explicitly to Burmese, not Malay', () => {
     expect(targetLanguageForLocale('my')).toContain('Burmese')
     expect(targetLanguageForLocale('my')).toContain('never Malay')

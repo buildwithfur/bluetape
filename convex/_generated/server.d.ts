@@ -32,6 +32,7 @@ type Env = {
   readonly AUTH_RESEND_KEY: string | undefined;
   readonly OPENROUTER_API_KEY: string | undefined;
   readonly OPENROUTER_TRANSLATION_MODEL: string | undefined;
+  readonly OPENROUTER_TRANSLATION_REASONING_EFFORT: string | undefined;
   readonly RECIPE_WORKER_SECRET: string | undefined;
 };
 

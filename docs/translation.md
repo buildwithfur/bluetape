@@ -138,6 +138,24 @@ meaning-preservation review as the default. If the API key is absent or the
 provider fails, authored source remains usable and the cache records a short
 retry cooldown.
 
+Translation requests disable model reasoning by default. Models that require
+reasoning, including OpenRouter-hosted `gpt-oss` variants, can opt into a
+supported effort independently per deployment:
+
+```sh
+# Development
+npx convex env set OPENROUTER_TRANSLATION_REASONING_EFFORT low
+
+# Production
+npx convex env set OPENROUTER_TRANSLATION_REASONING_EFFORT low --prod
+```
+
+Accepted values are `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, and
+`max`. Use `low` for translation unless a reviewed model requires a different
+setting. Invalid values fail closed instead of sending an ambiguous provider
+request. Reasoning-enabled calls receive a larger output budget so the model
+still has room for the structured translation response.
+
 ## Translation and cache behavior
 
 Authored fields are never overwritten. A separate `contentTranslations` table

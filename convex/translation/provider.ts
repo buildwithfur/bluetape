@@ -2,7 +2,21 @@ import { env } from "../_generated/server";
 
 const PROVIDER = "openrouter";
 export const DEFAULT_TRANSLATION_MODEL = "xiaomi/mimo-v2.5";
+export const DEFAULT_TRANSLATION_REASONING_EFFORT = "none";
 const ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
+
+const TRANSLATION_REASONING_EFFORTS = [
+  "none",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+] as const;
+
+export type TranslationReasoningEffort =
+  (typeof TRANSLATION_REASONING_EFFORTS)[number];
 
 export type TranslationProviderInput = {
   id: string;
@@ -43,6 +57,17 @@ export class TranslationProviderError extends Error {
     super(code);
     this.code = code;
   }
+}
+
+export function translationReasoningEffort(
+  configured: string | undefined,
+): TranslationReasoningEffort {
+  const effort = configured?.trim().toLowerCase()
+    || DEFAULT_TRANSLATION_REASONING_EFFORT;
+  if (!(TRANSLATION_REASONING_EFFORTS as readonly string[]).includes(effort)) {
+    throw new TranslationProviderError("provider_invalid_reasoning_effort");
+  }
+  return effort as TranslationReasoningEffort;
 }
 
 function baseLocale(locale: string): string {
@@ -145,6 +170,9 @@ export async function translateBatch(
   }
   if (inputs.length === 0) return [];
   const model = env.OPENROUTER_TRANSLATION_MODEL?.trim() || DEFAULT_TRANSLATION_MODEL;
+  const reasoningEffort = translationReasoningEffort(
+    env.OPENROUTER_TRANSLATION_REASONING_EFFORT,
+  );
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20_000);
@@ -158,9 +186,11 @@ export async function translateBatch(
       },
       body: JSON.stringify({
         model,
-        reasoning: { effort: "none" },
+        reasoning: { effort: reasoningEffort },
         temperature: 0.1,
-        max_tokens: 1200,
+        // Reasoning tokens count against the output budget. Preserve room for
+        // the same eight-field JSON batch when reasoning is enabled.
+        max_tokens: reasoningEffort === "none" ? 1200 : 2400,
         response_format: { type: "json_object" },
         messages: [
           {

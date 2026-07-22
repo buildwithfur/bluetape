@@ -16,8 +16,14 @@ export default defineApp({
     ALLOW_DEV_WIPE: v.optional(v.string()),
     /** Server-only OpenRouter credentials for on-demand text translation. */
     OPENROUTER_API_KEY: v.optional(v.string()),
-    /** Optional override; defaults to DeepSeek V4 Flash in the adapter. */
+    /** Optional model override; defaults to Xiaomi MiMo V2.5 in the adapter. */
     OPENROUTER_TRANSLATION_MODEL: v.optional(v.string()),
+    /**
+     * Optional OpenRouter reasoning effort for the translation model.
+     * Defaults to "none"; use "low" for models such as gpt-oss that require
+     * reasoning to remain enabled.
+     */
+    OPENROUTER_TRANSLATION_REASONING_EFFORT: v.optional(v.string()),
     /** Rotatable bearer secret used only by the external recipe worker. */
     RECIPE_WORKER_SECRET: v.optional(v.string()),
     /** Resend API key used for auth verification and password-reset emails. */
