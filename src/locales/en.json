@@ -206,7 +206,6 @@
   "record.status.pending": "Pending",
   "record.status.done": "Done",
   "login.title": "Bluetape",
-  "login.subtitle": "Household coordination",
   "login.displayName": "Display name",
   "login.email": "Email",
   "login.password": "Password",

@@ -32,7 +32,7 @@ export function ProfileBootstrap() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <TopBar title={t('login.subtitle')} showSearch={false} />
+      <TopBar title={t('app.name')} showSearch={false} />
       <div className="flex-1 flex flex-col justify-center app-max-w mx-auto w-full page-px">
         {error ? (
           <div className="flex flex-col gap-4">

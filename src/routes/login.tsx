@@ -240,7 +240,7 @@ export default function Login() {
       ? t('login.forgotPasswordInstructions')
       : view === 'resetPassword'
         ? t('login.resetPasswordInstructions', { email: email.trim() })
-        : t('login.subtitle')
+        : null
 
   const showEmailInput = view === 'signIn' || view === 'signUp' || view === 'forgotPassword'
   const showCurrentPassword = view === 'signIn' || view === 'signUp'
@@ -254,7 +254,7 @@ export default function Login() {
         <div className="mb-10 flex items-start justify-between gap-4">
           <div>
             <h1 className="text-[30px] font-semibold tracking-[-0.02em] text-ink">{title}</h1>
-            <p className="mono-md mt-1 max-w-sm text-text-tertiary">{subtitle}</p>
+            {subtitle && <p className="mono-md mt-1 max-w-sm text-text-tertiary">{subtitle}</p>}
           </div>
           <div ref={languageMenuRef} className="relative shrink-0">
             <button
