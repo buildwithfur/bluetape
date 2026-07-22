@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.1.0](https://github.com/buildwithfur/bluetape/compare/v1.0.0...v1.1.0) (2026-07-22)
+
+
+### Features
+
+* add gated lazy task translations ([5af9b6e](https://github.com/buildwithfur/bluetape/commit/5af9b6ed5c796c456ba53c0d398d2e24fa5d2ab6))
+* add recipe import workflow ([122f23c](https://github.com/buildwithfur/bluetape/commit/122f23c88f0b5fcc4d54778d2c424d09275d5022))
+* improve recipe import extraction and review ([6258a1a](https://github.com/buildwithfur/bluetape/commit/6258a1ac752cd7e90f71674c98f363c62f3a0597))
+
+
+### Bug Fixes
+
+* standardize translation language targeting ([df978d9](https://github.com/buildwithfur/bluetape/commit/df978d929cc66d3ff44c1c1d4289c5009c802ede))
+* suggest wiki links while editing ([3743a94](https://github.com/buildwithfur/bluetape/commit/3743a946670c55dc8754873233bcb322f4ae85d6))
+
 ## 1.0.0 (2026-07-16)
 
 
