@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.3.0](https://github.com/buildwithfur/bluetape/compare/v1.2.0...v1.3.0) (2026-07-22)
+
+
+### Features
+
+* add language selector to auth ([19a2480](https://github.com/buildwithfur/bluetape/commit/19a2480783d88249bf1ba9dfec7f824ad18f109c))
+* add lazy content translation ([6998293](https://github.com/buildwithfur/bluetape/commit/69982933930380cad5fe7d8087e9124ddb363bcc))
+* preserve grouped recipe components ([7a2ded8](https://github.com/buildwithfur/bluetape/commit/7a2ded8e56c8f427de17ebe0480f64711914cb0e))
+* use OpenRouter for recipe transcription ([b714c48](https://github.com/buildwithfur/bluetape/commit/b714c4842297f5218ac1ed10366e1dd8c7719f98))
+
+
+### Bug Fixes
+
+* avoid compressed website fetch responses ([7825d16](https://github.com/buildwithfur/bluetape/commit/7825d16ff04c305aa3343b19e7ffd3516620a808))
+* display today header in Singapore date ([41f1dad](https://github.com/buildwithfur/bluetape/commit/41f1dadc47c0f90507bb6d306316e44710290c70))
+* **family:** let members access family switcher ([479bb5c](https://github.com/buildwithfur/bluetape/commit/479bb5c39a080110ebb5bfca0630fae36316f936))
+* retry website fetch failures through proxy ([8742c06](https://github.com/buildwithfur/bluetape/commit/8742c0611abd963dd221b64065f25115f15202d3))
+
 ## [1.2.0](https://github.com/buildwithfur/bluetape/compare/v1.1.0...v1.2.0) (2026-07-22)
 
 
