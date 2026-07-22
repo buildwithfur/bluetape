@@ -142,7 +142,7 @@ Numbers must preserve their semantic value. Canonical wiki IDs, URLs, and code m
 
 ### Provider selection
 
-The initial adapter uses OpenRouter with `deepseek/deepseek-v4-flash` as its
+The initial adapter uses OpenRouter with `xiaomi/mimo-v2.5` as its
 default model. `OPENROUTER_TRANSLATION_MODEL` may override the model at the
 deployment level without adding provider-selection UI or changing client code.
 The server credential is `OPENROUTER_API_KEY`.

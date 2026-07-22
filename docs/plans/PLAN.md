@@ -378,7 +378,7 @@ Today's checklist                  ← label-caps, tertiary
 - Translation is enabled per profile only when `userProfiles.autoTranslateEnabled === true`. Missing/false is disabled, new profiles default false, and no public application mutation can change it.
 - The Language screen displays the flag as a disabled switch. An operator changes it directly in the Convex database.
 - A gated viewer sees source immediately; missing translations are generated for that viewer's selected locale only when the relevant UI content is viewed. Recipe and other editors always use source fields. A single app-level pending indicator is display-only and never creates work.
-- OpenRouter is the provider gateway. The default model is `deepseek/deepseek-v4-flash`; credentials remain server-side in `OPENROUTER_API_KEY`.
+- OpenRouter is the provider gateway. The default model is `xiaomi/mimo-v2.5`; credentials remain server-side in `OPENROUTER_API_KEY`.
 - Wiki identities, URLs, code, numbers, recipe quantities, and dates are protected across translation. Editing source invalidates cached results through `sourceHash`; translation never blocks save.
 - Search labels use the same cache when search is open, while query matching continues against authored source fields.
 

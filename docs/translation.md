@@ -115,7 +115,7 @@ to `.env.local`; browser-visible variables cannot protect a provider secret.
 The default model is:
 
 ```text
-deepseek/deepseek-v4-flash
+xiaomi/mimo-v2.5
 ```
 
 An operator may change the model without a code deployment:

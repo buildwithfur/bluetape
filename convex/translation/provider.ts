@@ -1,7 +1,7 @@
 import { env } from "../_generated/server";
 
 const PROVIDER = "openrouter";
-export const DEFAULT_TRANSLATION_MODEL = "deepseek/deepseek-v4-flash";
+export const DEFAULT_TRANSLATION_MODEL = "xiaomi/mimo-v2.5";
 const ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 
 export type TranslationProviderInput = {
