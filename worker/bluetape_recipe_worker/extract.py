@@ -213,7 +213,10 @@ def _safe_fetch(
         with httpx.Client(
             timeout=20,
             follow_redirects=False,
-            headers={"User-Agent": "BluetapeRecipeBot/1.0"},
+            headers={
+                "User-Agent": "BluetapeRecipeBot/1.0",
+                "Accept-Encoding": "identity",
+            },
             proxy=proxy,
         ) as client:
             for _ in range(max_redirects + 1):

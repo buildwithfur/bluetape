@@ -493,3 +493,44 @@ def test_website_network_failure_retries_once_through_proxy(
     assert access.fetch("https://example.com/recipe") is response
     assert calls == [None, access.proxy_url]
     assert access.using_proxy is True
+
+
+def test_safe_fetch_requests_identity_encoding(monkeypatch: pytest.MonkeyPatch) -> None:
+    client_options: dict = {}
+
+    class FakeResponse:
+        status_code = 200
+        headers: dict[str, str] = {}
+        request = object()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def raise_for_status(self):
+            return None
+
+        def iter_bytes(self):
+            yield b"recipe"
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            client_options.update(kwargs)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def stream(self, *_args, **_kwargs):
+            return FakeResponse()
+
+    monkeypatch.setattr(extract.httpx, "Client", FakeClient)
+    monkeypatch.setattr(extract, "validate_public_url", lambda _url: None)
+
+    extract._safe_fetch("https://example.com/recipe")
+
+    assert client_options["headers"]["Accept-Encoding"] == "identity"
