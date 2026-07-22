@@ -34,7 +34,7 @@ export function todayLabel(date = new Date()): string {
     day: 'numeric',
     month: 'short',
     timeZone: SG_TZ,
-  }).format(inSGDate(date))
+  }).format(date)
 }
 
 /** Compute "today" in Asia/Singapore as a YYYY-MM-DD string. */
@@ -50,32 +50,6 @@ export function todayInSG(now: Date = new Date()): string {
   const m = parts.find((p) => p.type === 'month')?.value ?? '01'
   const d = parts.find((p) => p.type === 'day')?.value ?? '01'
   return `${y}-${m}-${d}`
-}
-
-/** Build a Date that, when formatted in SG, yields the same calendar day. */
-function inSGDate(now: Date): Date {
-  // We need the SG-local Y/M/D/H parts; easiest is to read the parts and
-  // construct a UTC Date that *represents* SG wall time (offset isn't applied
-  // because we only use the formatted output, never the epoch value).
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-    timeZone: SG_TZ,
-  }).formatToParts(now)
-  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '0'
-  return new Date(
-    Date.UTC(
-      Number(get('year')),
-      Number(get('month')) - 1,
-      Number(get('day')),
-      Number(get('hour')),
-      Number(get('minute')),
-    ),
-  )
 }
 
 /** Relative day verbose for routine frequency labels: "1st · monthly" etc. */
