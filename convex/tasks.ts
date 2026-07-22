@@ -4,6 +4,7 @@ import {
   isOwner,
   requireFamilyAdmin,
   requireFamilyMember,
+  requireProfile,
 } from "./permissions";
 import { canonicalizeWikiReferences } from "./wiki";
 
@@ -87,6 +88,7 @@ export const add = mutation({
   },
   handler: async (ctx, args) => {
     const { userId } = await requireFamilyMember(ctx, args.familyId);
+    const profile = await requireProfile(ctx, userId);
     if (!args.title.trim()) throw new Error("Task title cannot be empty");
     const title = await canonicalizeWikiReferences(
       ctx,
@@ -96,6 +98,7 @@ export const add = mutation({
     const taskId = await ctx.db.insert("tasks", {
       familyId: args.familyId,
       title,
+      titleLocale: profile.locale,
       status: "pending",
       dueDate: args.dueDate,
       createdBy: userId,
@@ -114,13 +117,15 @@ export const updateDetails = mutation({
   handler: async (ctx, args) => {
     const task = await ctx.db.get(args.taskId);
     if (!task) throw new Error("Task not found");
-    await requireFamilyAdmin(ctx, task.familyId);
+    const { userId } = await requireFamilyAdmin(ctx, task.familyId);
+    const profile = await requireProfile(ctx, userId);
 
-    const patch: { title?: string; note?: string } = {};
+    const patch: { title?: string; titleLocale?: string; note?: string; noteLocale?: string } = {};
     if (args.title !== undefined) {
       const title = args.title.trim();
       if (!title) throw new Error("Task title cannot be empty");
       patch.title = await canonicalizeWikiReferences(ctx, task.familyId, title);
+      patch.titleLocale = profile.locale;
     }
     if (args.note !== undefined) {
       patch.note = await canonicalizeWikiReferences(
@@ -128,6 +133,7 @@ export const updateDetails = mutation({
         task.familyId,
         args.note.trim(),
       );
+      patch.noteLocale = profile.locale;
     }
     await ctx.db.patch(args.taskId, patch);
     return ctx.db.get(args.taskId);

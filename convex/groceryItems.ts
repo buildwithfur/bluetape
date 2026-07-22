@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
-import { isOwner, requireFamilyMember } from "./permissions";
+import { isOwner, requireFamilyMember, requireProfile } from "./permissions";
 import { canonicalizeWikiReferences } from "./wiki";
 import { singaporeDayBounds } from "./date";
 
@@ -78,6 +78,7 @@ export const add = mutation({
   },
   handler: async (ctx, args) => {
     const { userId } = await requireFamilyMember(ctx, args.familyId);
+    const profile = await requireProfile(ctx, userId);
     if (!args.name.trim()) throw new Error("Item name cannot be empty");
     const name = await canonicalizeWikiReferences(
       ctx,
@@ -87,6 +88,7 @@ export const add = mutation({
     const itemId = await ctx.db.insert("groceryItems", {
       familyId: args.familyId,
       name,
+      nameLocale: profile.locale,
       count: Math.max(1, Math.trunc(args.count ?? 1)),
       status: "pending",
       addedBy: userId,

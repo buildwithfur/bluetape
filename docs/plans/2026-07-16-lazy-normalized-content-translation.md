@@ -79,9 +79,11 @@ The target locale is always derived from the signed-in viewer's current profile.
 
 This behavior is the reason to keep the system purely on demand. It handles language changes without eager fan-out or a migration workflow.
 
-### Unknown source language is acceptable
+### Record source locale at authoring time
 
-Do not add an input-language selector and do not infer source language from the author's UI locale. The provider detects the source language during the first requested generation.
+Do not add an input-language selector. Record the author's selected profile locale on each field when it is created or edited; imported content records the locale established by its import pipeline. Compare that source metadata with the viewer's current profile locale before claiming provider work.
+
+If source and target locales match, show authored text directly and do not create a translation job. Existing fields without locale metadata retain the original provider-detection fallback until edited or cached.
 
 If the detected source language already matches the target locale:
 
@@ -90,7 +92,7 @@ If the detected source language already matches the target locale:
 - do not display the normalized text
 - reuse that result so the same source/locale pair is not analyzed again
 
-This may spend one call on a same-language cache miss. That is a deliberate simplicity trade-off.
+Only legacy fields without source-locale metadata may spend one call on a same-language cache miss.
 
 ---
 

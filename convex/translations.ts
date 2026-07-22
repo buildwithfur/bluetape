@@ -112,6 +112,15 @@ function assertSupportedLocale(locale: string): void {
   }
 }
 
+function baseLocale(locale: string): string {
+  return locale.trim().toLowerCase().split(/[-_]/)[0] ?? "";
+}
+
+function localesMatch(sourceLocale: string | undefined, targetLocale: string): boolean {
+  return sourceLocale !== undefined &&
+    baseLocale(sourceLocale) === baseLocale(targetLocale);
+}
+
 function refFromTranslation(
   translation: Doc<"contentTranslations">,
 ): TranslationFieldRef | null {
@@ -175,7 +184,7 @@ async function sourceForRef(
   ctx: QueryCtx | MutationCtx,
   familyId: Id<"families">,
   ref: TranslationFieldRef,
-): Promise<{ source: string; mode: TranslationMode }> {
+): Promise<{ source: string; sourceLocale?: string; mode: TranslationMode }> {
   switch (ref.entityType) {
     case "task": {
       const task = await ctx.db.get(ref.entityId);
@@ -184,6 +193,7 @@ async function sourceForRef(
       }
       return {
         source: ref.field === "title" ? task.title : task.note ?? "",
+        sourceLocale: ref.field === "title" ? task.titleLocale : task.noteLocale,
         mode: ref.field === "title" ? "label" : "instruction",
       };
     }
@@ -194,6 +204,7 @@ async function sourceForRef(
       }
       return {
         source: ref.field === "title" ? recipe.title : recipe.notes ?? "",
+        sourceLocale: ref.field === "title" ? recipe.titleLocale : recipe.notesLocale,
         mode: ref.field === "title" ? "label" : "document",
       };
     }
@@ -202,14 +213,14 @@ async function sourceForRef(
       if (!ingredient || ingredient.familyId !== familyId) {
         throw new Error("Recipe ingredient not found in current family");
       }
-      return { source: ingredient.text, mode: "ingredient" };
+      return { source: ingredient.text, sourceLocale: ingredient.sourceLocale, mode: "ingredient" };
     }
     case "recipeStep": {
       const step = await ctx.db.get(ref.entityId);
       if (!step || step.familyId !== familyId) {
         throw new Error("Recipe step not found in current family");
       }
-      return { source: step.text, mode: "instruction" };
+      return { source: step.text, sourceLocale: step.sourceLocale, mode: "instruction" };
     }
     case "routine": {
       const routine = await ctx.db.get(ref.entityId);
@@ -218,6 +229,7 @@ async function sourceForRef(
       }
       return {
         source: ref.field === "title" ? routine.title : routine.description ?? "",
+        sourceLocale: ref.field === "title" ? routine.titleLocale : routine.descriptionLocale,
         mode: ref.field === "title" ? "label" : "instruction",
       };
     }
@@ -232,6 +244,11 @@ async function sourceForRef(
           : ref.field === "location"
             ? page.location ?? ""
             : page.content,
+        sourceLocale: ref.field === "title"
+          ? page.titleLocale
+          : ref.field === "location"
+            ? page.locationLocale
+            : page.contentLocale,
         mode: ref.field === "content" ? "document" : "label",
       };
     }
@@ -240,7 +257,7 @@ async function sourceForRef(
       if (!item || item.familyId !== familyId) {
         throw new Error("Grocery item not found in current family");
       }
-      return { source: item.name, mode: "label" };
+      return { source: item.name, sourceLocale: item.nameLocale, mode: "label" };
     }
   }
 }
@@ -277,9 +294,13 @@ export const getForFields = query({
 
     const results = [];
     for (const ref of args.fields) {
-      const { source } = await sourceForRef(ctx, profile.currentFamilyId, ref);
+      const { source, sourceLocale } = await sourceForRef(ctx, profile.currentFamilyId, ref);
       if (!source.trim()) {
         results.push({ ...ref, state: "empty" as const });
+        continue;
+      }
+      if (localesMatch(sourceLocale, profile.locale)) {
+        results.push({ ...ref, state: "source_is_target" as const });
         continue;
       }
       const sourceHash = await sha256Hex(source);
@@ -318,8 +339,9 @@ export const ensureForFields = mutation({
     const now = Date.now();
     const claims: Array<{ translationId: Id<"contentTranslations">; sourceHash: string; generation: number }> = [];
     for (const ref of args.fields) {
-      const { source } = await sourceForRef(ctx, profile.currentFamilyId, ref);
+      const { source, sourceLocale } = await sourceForRef(ctx, profile.currentFamilyId, ref);
       if (!source.trim()) continue;
+      if (localesMatch(sourceLocale, profile.locale)) continue;
       const sourceHash = await sha256Hex(source);
       const existing = await findTranslation(ctx, profile.currentFamilyId, ref, profile.locale);
       if (existing?.sourceHash === sourceHash &&
@@ -379,6 +401,7 @@ export const getActivity = query({
           .eq("targetLocale", profile.locale)
           .eq("status", "pending"),
       )
+      .filter((q) => q.gt(q.field("leaseExpiresAt"), Date.now()))
       .take(1);
     return { enabled: true, pending: rows.length > 0 };
   },

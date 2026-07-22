@@ -5,6 +5,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import {
   requireFamilyMember,
   requireFamilyAdmin,
+  requireProfile,
   isOwner,
 } from "./permissions";
 import {
@@ -254,6 +255,7 @@ export const save = mutation({
       args.familyId,
     );
     const isAdmin = isOwner(family, userId) || membership.role === "admin";
+    const profile = await requireProfile(ctx, userId);
 
     // Rule pages are admin-only.
     if (args.type === "rule" && !isAdmin) {
@@ -296,10 +298,13 @@ export const save = mutation({
       );
       await ctx.db.patch(args.pageId, {
         title: args.title,
+        titleLocale: profile.locale,
         slug,
         type: args.type,
         content: preResolvedContent,
+        contentLocale: profile.locale,
         location: args.location,
+        locationLocale: args.location === undefined ? undefined : profile.locale,
         photoId: args.photoId,
         pinnedToToday: args.pinnedToToday,
         updatedBy: userId,
@@ -329,10 +334,13 @@ export const save = mutation({
     const pageId = await ctx.db.insert("pages", {
       familyId: args.familyId,
       title: args.title,
+      titleLocale: profile.locale,
       slug,
       type: args.type,
       content: args.content,
+      contentLocale: profile.locale,
       location: args.location,
+      locationLocale: args.location === undefined ? undefined : profile.locale,
       photoId: args.photoId,
       pinnedToToday: args.pinnedToToday,
       createdBy: userId,

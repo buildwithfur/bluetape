@@ -161,7 +161,12 @@ async function childrenFor(ctx: QueryCtx | MutationCtx, recipeId: Id<"recipes">)
   return { ingredients, steps, sections };
 }
 
-async function replaceChildren(ctx: MutationCtx, recipe: Doc<"recipes">, sections: RecipeSectionInput[]) {
+async function replaceChildren(
+  ctx: MutationCtx,
+  recipe: Doc<"recipes">,
+  sections: RecipeSectionInput[],
+  sourceLocale?: string,
+) {
   const existing = await childrenFor(ctx, recipe._id);
   for (const row of existing.ingredients) {
     await deleteTranslationsFor(ctx, recipe.familyId, "recipeIngredient", row._id);
@@ -176,12 +181,12 @@ async function replaceChildren(ctx: MutationCtx, recipe: Doc<"recipes">, section
   for (const section of sections) {
     for (const text of section.ingredients) {
       await ctx.db.insert("recipeIngredients", {
-        familyId: recipe.familyId, recipeId: recipe._id, section: section.name || undefined, text, sortOrder: ingredientSortOrder++,
+        familyId: recipe.familyId, recipeId: recipe._id, section: section.name || undefined, text, sourceLocale, sortOrder: ingredientSortOrder++,
       });
     }
     for (const text of section.steps) {
       await ctx.db.insert("recipeSteps", {
-        familyId: recipe.familyId, recipeId: recipe._id, section: section.name || undefined, text, sortOrder: stepSortOrder++,
+        familyId: recipe.familyId, recipeId: recipe._id, section: section.name || undefined, text, sourceLocale, sortOrder: stepSortOrder++,
       });
     }
   }
@@ -390,6 +395,7 @@ export const publish = mutation({
     if (!recipe) throw new Error("Recipe draft not found");
     const access = await requireFamilyMember(ctx, recipe.familyId);
     if (!canManage(recipe, access)) throw new Error("You cannot publish this recipe");
+    const profile = await requireProfile(ctx, access.userId);
     const rawSections = args.sections ?? legacySections(args.ingredients ?? [], args.steps ?? []);
     const sections = cleanSections(rawSections);
     const canonicalSections = await Promise.all(sections.map(async (section) => ({
@@ -399,12 +405,13 @@ export const publish = mutation({
     })));
     const title = await canonicalizeWikiReferences(ctx, recipe.familyId, cleanTitle(args.title));
     const notes = args.notes?.trim() || undefined;
-    await replaceChildren(ctx, recipe, canonicalSections);
+    await replaceChildren(ctx, recipe, canonicalSections, profile.locale);
     const ingredients = canonicalSections.flatMap((section) => section.ingredients);
     const steps = canonicalSections.flatMap((section) => section.steps);
     const now = Date.now();
     await ctx.db.patch(recipe._id, {
-      title, notes, status: "published", searchText: `${title}\n${ingredients.join("\n")}\n${notes ?? ""}`.toLowerCase(),
+      title, titleLocale: recipe.sourceLanguage, notes, notesLocale: notes === undefined ? undefined : profile.locale,
+      status: "published", searchText: `${title}\n${ingredients.join("\n")}\n${notes ?? ""}`.toLowerCase(),
       ingredientCount: ingredients.length, stepCount: steps.length, updatedBy: access.userId, updatedAt: now, reviewedAt: now,
     });
     await ctx.db.patch(job._id, { status: "published", stage: "published", leaseToken: undefined, leaseExpiresAt: undefined, updatedAt: now });
@@ -422,6 +429,7 @@ export const update = mutation({
     if (!recipe) throw new Error("Recipe not found");
     const access = await requireFamilyMember(ctx, recipe.familyId);
     if (!canManage(recipe, access)) throw new Error("You cannot edit this recipe");
+    const profile = await requireProfile(ctx, access.userId);
     const sections = cleanSections(args.sections ?? legacySections(args.ingredients ?? [], args.steps ?? []));
     const canonicalSections = await Promise.all(sections.map(async (section) => ({
       ...section,
@@ -430,11 +438,12 @@ export const update = mutation({
     })));
     const title = await canonicalizeWikiReferences(ctx, recipe.familyId, cleanTitle(args.title));
     const notes = args.notes?.trim() || undefined;
-    await replaceChildren(ctx, recipe, canonicalSections);
+    await replaceChildren(ctx, recipe, canonicalSections, profile.locale);
     const ingredients = canonicalSections.flatMap((section) => section.ingredients);
     const steps = canonicalSections.flatMap((section) => section.steps);
     await ctx.db.patch(recipe._id, {
-      title, notes, searchText: `${title}\n${ingredients.join("\n")}\n${notes ?? ""}`.toLowerCase(),
+      title, titleLocale: profile.locale, notes, notesLocale: notes === undefined ? undefined : profile.locale,
+      searchText: `${title}\n${ingredients.join("\n")}\n${notes ?? ""}`.toLowerCase(),
       ingredientCount: ingredients.length, stepCount: steps.length, updatedBy: access.userId, updatedAt: Date.now(), manuallyEditedAt: Date.now(),
     });
     return recipe._id;
@@ -552,12 +561,13 @@ export const completeWorkerDraft = internalMutation({
     const sections = cleanSections(args.sections
       ? [{ name: "", ingredients: args.ingredients ?? [], steps: [] }, ...args.sections]
       : legacySections(args.ingredients ?? [], args.steps ?? []));
-    await replaceChildren(ctx, recipe, sections);
+    await replaceChildren(ctx, recipe, sections, job.targetLocale ?? "en");
     const ingredients = sections.flatMap((section) => section.ingredients);
     const steps = sections.flatMap((section) => section.steps);
     const now = Date.now();
     await ctx.db.patch(recipe._id, {
-      title, sourceName: args.sourceName?.trim() || undefined, sourceImageUrl: args.sourceImageUrl?.trim() || undefined,
+      title, titleLocale: args.sourceLanguage?.trim() || undefined,
+      sourceName: args.sourceName?.trim() || undefined, sourceImageUrl: args.sourceImageUrl?.trim() || undefined,
       sourceLanguage: args.sourceLanguage?.trim() || undefined, searchText: `${title}\n${ingredients.join("\n")}`.toLowerCase(),
       ingredientCount: ingredients.length, stepCount: steps.length, updatedAt: now,
     });

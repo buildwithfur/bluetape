@@ -3,6 +3,7 @@ import { query, mutation } from "./_generated/server";
 import {
   requireFamilyMember,
   requireFamilyAdmin,
+  requireProfile,
   isOwner,
 } from "./permissions";
 import { canonicalizeWikiReferences } from "./wiki";
@@ -104,6 +105,7 @@ export const create = mutation({
   },
   handler: async (ctx, args) => {
     const { userId } = await requireFamilyAdmin(ctx, args.familyId);
+    const profile = await requireProfile(ctx, userId);
     if (args.frequency === "weekly" && args.dayOfWeek === undefined) {
       throw new Error("dayOfWeek is required for weekly routines");
     }
@@ -127,7 +129,9 @@ export const create = mutation({
     const routineId = await ctx.db.insert("routines", {
       familyId: args.familyId,
       title,
+      titleLocale: profile.locale,
       description,
+      descriptionLocale: description === undefined ? undefined : profile.locale,
       frequency: args.frequency,
       dayOfWeek: args.dayOfWeek,
       dayOfMonth: args.dayOfMonth,
@@ -157,7 +161,8 @@ export const update = mutation({
   handler: async (ctx, args) => {
     const existing = await ctx.db.get(args.routineId);
     if (!existing) throw new Error("Routine not found");
-    await requireFamilyAdmin(ctx, existing.familyId);
+    const { userId } = await requireFamilyAdmin(ctx, existing.familyId);
+    const profile = await requireProfile(ctx, userId);
     const patch: Record<string, unknown> = {};
     if (args.title !== undefined) {
       patch.title = await canonicalizeWikiReferences(
@@ -165,6 +170,7 @@ export const update = mutation({
         existing.familyId,
         args.title,
       );
+      patch.titleLocale = profile.locale;
     }
     if (args.description !== undefined) {
       patch.description = await canonicalizeWikiReferences(
@@ -172,6 +178,7 @@ export const update = mutation({
         existing.familyId,
         args.description,
       );
+      patch.descriptionLocale = profile.locale;
     }
     if (args.frequency !== undefined) patch.frequency = args.frequency;
     if (args.dayOfWeek !== undefined) patch.dayOfWeek = args.dayOfWeek;

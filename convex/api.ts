@@ -94,6 +94,7 @@ export const addTask = internalMutation({
     const taskId = await ctx.db.insert("tasks", {
       familyId: args.familyId,
       title,
+      titleLocale: "en",
       status: "pending",
       dueDate: args.dueDate,
       createdBy: userId,
@@ -133,6 +134,7 @@ export const addGroceryItem = internalMutation({
     const itemId = await ctx.db.insert("groceryItems", {
       familyId: args.familyId,
       name,
+      nameLocale: "en",
       count: Number.isFinite(legacyCount) && legacyCount > 0 ? legacyCount : 1,
       quantity: args.quantity,
       status: "pending",
@@ -212,7 +214,9 @@ export const createRoutine = internalMutation({
     const routineId = await ctx.db.insert("routines", {
       familyId: args.familyId,
       title,
+      titleLocale: "en",
       description,
+      descriptionLocale: description === undefined ? undefined : "en",
       frequency: args.frequency,
       dayOfWeek: args.dayOfWeek,
       dayOfMonth: args.dayOfMonth,
@@ -293,10 +297,13 @@ export const savePage = internalMutation({
       );
       await ctx.db.patch(args.pageId, {
         title: args.title,
+        titleLocale: "en",
         slug,
         type: args.type,
         content: preResolvedContent,
+        contentLocale: "en",
         location: args.location,
+        locationLocale: args.location === undefined ? undefined : "en",
         photoId: args.photoId,
         pinnedToToday: args.pinnedToToday,
         updatedBy: userId,
@@ -325,10 +332,13 @@ export const savePage = internalMutation({
     const pageId = await ctx.db.insert("pages", {
       familyId: args.familyId,
       title: args.title,
+      titleLocale: "en",
       slug,
       type: args.type,
       content: args.content,
+      contentLocale: "en",
       location: args.location,
+      locationLocale: args.location === undefined ? undefined : "en",
       photoId: args.photoId,
       pinnedToToday: args.pinnedToToday,
       createdBy: userId,

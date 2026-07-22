@@ -48,10 +48,13 @@ export default defineSchema({
   pages: defineTable({
     familyId: v.id("families"),
     title: v.string(),
+    titleLocale: v.optional(v.string()),
     slug: v.string(),
     type: v.union(v.literal("item"), v.literal("rule")),
     content: v.string(),
+    contentLocale: v.optional(v.string()),
     location: v.optional(v.string()),
+    locationLocale: v.optional(v.string()),
     photoId: v.optional(v.id("_storage")),
     pinnedToToday: v.optional(v.boolean()),
     createdBy: v.id("users"),
@@ -81,7 +84,9 @@ export default defineSchema({
   routines: defineTable({
     familyId: v.id("families"),
     title: v.string(),
+    titleLocale: v.optional(v.string()),
     description: v.optional(v.string()),
+    descriptionLocale: v.optional(v.string()),
     frequency: v.union(
       v.literal("daily"),
       v.literal("weekly"),
@@ -102,7 +107,9 @@ export default defineSchema({
   tasks: defineTable({
     familyId: v.id("families"),
     title: v.string(),
+    titleLocale: v.optional(v.string()),
     note: v.optional(v.string()),
+    noteLocale: v.optional(v.string()),
     status: v.union(v.literal("pending"), v.literal("done")),
     dueDate: v.optional(v.string()),
     createdBy: v.id("users"),
@@ -119,6 +126,7 @@ export default defineSchema({
   recipes: defineTable({
     familyId: v.id("families"),
     title: v.string(),
+    titleLocale: v.optional(v.string()),
     status: v.union(v.literal("draft"), v.literal("published")),
     sourceUrl: v.string(),
     normalizedSourceUrl: v.string(),
@@ -135,6 +143,7 @@ export default defineSchema({
     sourceLanguage: v.optional(v.string()),
     /** Optional free-form serving, storage, and substitution notes. */
     notes: v.optional(v.string()),
+    notesLocale: v.optional(v.string()),
     searchText: v.string(),
     ingredientCount: v.number(),
     stepCount: v.number(),
@@ -155,6 +164,7 @@ export default defineSchema({
     // Optional so existing flat recipes stay readable without a migration.
     section: v.optional(v.string()),
     text: v.string(),
+    sourceLocale: v.optional(v.string()),
     sortOrder: v.number(),
   })
     .index("familyId", ["familyId"])
@@ -166,6 +176,7 @@ export default defineSchema({
     // Optional so existing flat recipes stay readable without a migration.
     section: v.optional(v.string()),
     text: v.string(),
+    sourceLocale: v.optional(v.string()),
     sortOrder: v.number(),
   })
     .index("familyId", ["familyId"])
@@ -226,6 +237,7 @@ export default defineSchema({
   groceryItems: defineTable({
     familyId: v.id("families"),
     name: v.string(),
+    nameLocale: v.optional(v.string()),
     count: v.optional(v.number()),
     // Legacy free-text quantity. New writes use count; retained so existing
     // rows remain readable without a blocking migration.

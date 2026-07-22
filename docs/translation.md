@@ -19,12 +19,20 @@ The lazy translation cache covers:
 It does not translate account/family names, email addresses, or numeric counts.
 Editors always read and write the original authored fields.
 
+Each newly authored or edited field records the author's selected profile
+locale as source metadata. Imported recipe fields use the locale established by
+the import pipeline. The source locale is compared with the viewer's locale
+before any provider work is claimed.
+
 When enabled, a view renders the original text immediately. It then reads a
 cached translation for the viewer's current locale or requests one missing
 translation in the background. Convex reactivity replaces the displayed text
 when the result becomes ready. A single app-level “Translating content…”
-indicator appears only while one or more viewer-locale jobs are pending; it
-does not create jobs itself. A provider failure leaves original text visible.
+indicator appears only while one or more current jobs are translating from a
+different recorded source locale into the viewer's locale; it does not create
+jobs itself. Same-locale fields use authored text directly. Legacy fields that
+predate source-locale metadata fall back to provider detection once. A provider
+failure leaves original text visible.
 
 ## Per-user feature flag
 

@@ -9,7 +9,7 @@ import { sha256Hex } from './lib/sha256'
 
 const modules = import.meta.glob('./**/*.ts')
 
-async function setupProfile(options?: { enabled?: boolean; locale?: string }) {
+async function setupProfile(options?: { enabled?: boolean; locale?: string; sourceLocale?: string }) {
   const t = convexTest(schema, modules)
   const ids = await t.run(async (ctx) => {
     const userId = await ctx.db.insert('users', { name: 'Helper' })
@@ -37,6 +37,7 @@ async function setupProfile(options?: { enabled?: boolean; locale?: string }) {
     const taskId = await ctx.db.insert('tasks', {
       familyId,
       title: 'you dont anyhow throw things around',
+      titleLocale: options?.sourceLocale,
       status: 'pending',
       createdBy: userId,
       createdAt: 1,
@@ -110,6 +111,69 @@ describe('translation feature gate', () => {
     expect(rows).toHaveLength(1)
     expect(rows[0]?.status).toBe('pending')
     expect(rows[0]?.generation).toBe(1)
+  })
+
+  it('does not create a job when the source and viewer locales match', async () => {
+    const { t, userId, taskId } = await setupProfile({
+      enabled: true,
+      locale: 'en',
+      sourceLocale: 'en-SG',
+    })
+    const user = asUser(t, userId)
+    const fields = [{ entityType: 'task' as const, entityId: taskId, field: 'title' as const }]
+
+    await expect(user.query(api.translations.getForFields, { fields })).resolves.toEqual({
+      enabled: true,
+      results: [{ ...fields[0], state: 'source_is_target' }],
+    })
+    await user.mutation(api.translations.ensureForFields, { fields })
+    await expect(user.query(api.translations.getActivity, {})).resolves.toEqual({
+      enabled: true,
+      pending: false,
+    })
+    expect(await t.run((ctx) => ctx.db.query('contentTranslations').collect())).toHaveLength(0)
+  })
+
+  it('creates a job when the source and viewer locales differ', async () => {
+    const { t, userId, taskId } = await setupProfile({
+      enabled: true,
+      locale: 'en',
+      sourceLocale: 'my-MM',
+    })
+    const user = asUser(t, userId)
+    const fields = [{ entityType: 'task' as const, entityId: taskId, field: 'title' as const }]
+
+    await user.mutation(api.translations.ensureForFields, { fields })
+
+    const rows = await t.run((ctx) => ctx.db.query('contentTranslations').collect())
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ targetLocale: 'en', status: 'pending' })
+    await expect(user.query(api.translations.getActivity, {})).resolves.toEqual({
+      enabled: true,
+      pending: true,
+    })
+  })
+
+  it('does not report an expired pending lease as active translation work', async () => {
+    const { t, userId, familyId, taskId } = await setupProfile({ enabled: true })
+    const sourceHash = await sha256Hex('you dont anyhow throw things around')
+    await t.run((ctx) => ctx.db.insert('contentTranslations', {
+      familyId,
+      entityType: 'task',
+      entityId: taskId,
+      field: 'title',
+      targetLocale: 'my',
+      sourceHash,
+      generation: 1,
+      status: 'pending',
+      leaseExpiresAt: Date.now() - 1,
+      updatedAt: 1,
+    }))
+
+    await expect(asUser(t, userId).query(api.translations.getActivity, {})).resolves.toEqual({
+      enabled: true,
+      pending: false,
+    })
   })
 
   it('retries a first-attempt provider truncation through smaller batches', async () => {
