@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.4.0](https://github.com/buildwithfur/bluetape/compare/v1.3.0...v1.4.0) (2026-07-22)
+
+
+### Features
+
+* **auth:** add verified email and Google sign-in ([bfc5613](https://github.com/buildwithfur/bluetape/commit/bfc561335e1320d1bacf0056bfe8271f43f98a57))
+
+
+### Bug Fixes
+
+* **auth:** prevent email configuration lockout ([8f75813](https://github.com/buildwithfur/bluetape/commit/8f75813672ce75f9f5c67e8fd365d309d250055e))
+* **search:** allow closing mobile search sheet ([02630ee](https://github.com/buildwithfur/bluetape/commit/02630ee92ad7261951e928688c8d0484b90b9424))
+* show source text immediately while translations load ([362b87c](https://github.com/buildwithfur/bluetape/commit/362b87cc839360ad886342e387ed179c222d6523))
+* **translation:** only queue cross-locale content ([54a256e](https://github.com/buildwithfur/bluetape/commit/54a256ebe633f8c90938e05f2e4e229f1fa3cb20))
+* use Xiaomi MiMo for translations ([1ed2936](https://github.com/buildwithfur/bluetape/commit/1ed2936f388198e37a91a677c56dba673436a5f6))
+
 ## [1.3.0](https://github.com/buildwithfur/bluetape/compare/v1.2.0...v1.3.0) (2026-07-22)
 
 
