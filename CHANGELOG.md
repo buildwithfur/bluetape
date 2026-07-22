@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.2.0](https://github.com/buildwithfur/bluetape/compare/v1.1.0...v1.2.0) (2026-07-22)
+
+
+### Features
+
+* reorganize notes and routines navigation ([8de41e8](https://github.com/buildwithfur/bluetape/commit/8de41e897e310a1e667ede57c98d57c25a4f074c))
+
+
+### Bug Fixes
+
+* retry blocked recipe imports through proxy ([2e60f36](https://github.com/buildwithfur/bluetape/commit/2e60f36573fa0c9f41e2a4ee06573c81df0f1581))
+* support unicode recipe wiki targets ([9287764](https://github.com/buildwithfur/bluetape/commit/92877649fa62d1f81b3416b91ecb084473e5b14f))
+
 ## [1.1.0](https://github.com/buildwithfur/bluetape/compare/v1.0.0...v1.1.0) (2026-07-22)
 
 
