@@ -69,7 +69,7 @@ class SourceAccess:
             if (
                 self.using_proxy
                 or not self.proxy_url
-                or direct_error.code != "source_unavailable"
+                or not _should_retry_with_proxy(direct_error)
             ):
                 raise _redact_proxy_error(direct_error, self.proxy_url) from direct_error
             self.using_proxy = True
@@ -97,7 +97,7 @@ class SourceAccess:
             if (
                 self.using_proxy
                 or not self.proxy_url
-                or direct_error.code != "source_unavailable"
+                or not _should_retry_with_proxy(direct_error)
             ):
                 raise _redact_proxy_error(direct_error, self.proxy_url) from direct_error
             self.using_proxy = True
@@ -125,7 +125,7 @@ class SourceAccess:
             if (
                 self.using_proxy
                 or not self.proxy_url
-                or direct_error.code != "site_blocked"
+                or not _should_retry_with_proxy(direct_error)
             ):
                 raise _redact_proxy_error(direct_error, self.proxy_url) from direct_error
             self.using_proxy = True
@@ -145,6 +145,25 @@ def _redact_proxy_error(error: ExtractionError, proxy_url: str | None) -> Extrac
     if proxy_url:
         message = message.replace(proxy_url, "[proxy]")
     return ExtractionError(error.code, message)
+
+
+def _should_retry_with_proxy(error: ExtractionError) -> bool:
+    """Retry only platform-block signals, never arbitrary extractor failures."""
+    if error.code == "site_blocked":
+        return True
+    if error.code != "source_unavailable":
+        return False
+    detail = str(error).lower()
+    return any(marker in detail for marker in (
+        "http error 401",
+        "http error 403",
+        "http error 407",
+        "http error 429",
+        "too many requests",
+        "rate limit",
+        "confirm you\u2019re not a bot",
+        "confirm you're not a bot",
+    ))
 
 
 def _gallery_error(error: ExtractionError) -> ExtractionError:
@@ -221,7 +240,7 @@ def _safe_fetch(
     except ExtractionError:
         raise
     except httpx.HTTPError as exc:
-        raise ExtractionError("site_blocked", "Source request failed") from exc
+        raise ExtractionError("source_unavailable", "Source request failed") from exc
     raise ExtractionError("too_many_redirects", "Source redirected too many times")
 
 

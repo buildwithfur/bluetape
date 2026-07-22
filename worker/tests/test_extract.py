@@ -441,7 +441,7 @@ def test_proxy_stays_active_after_direct_failure(monkeypatch: pytest.MonkeyPatch
     def fake_run(command, **_kwargs):
         commands.append(command)
         if len(commands) == 1:
-            raise ExtractionError("source_unavailable", "blocked")
+            raise ExtractionError("source_unavailable", "ERROR: HTTP Error 429: Too Many Requests")
         return completed_process("{}")
 
     monkeypatch.setattr(extract, "_run", fake_run)
@@ -453,3 +453,23 @@ def test_proxy_stays_active_after_direct_failure(monkeypatch: pytest.MonkeyPatch
     assert "--proxy" not in commands[0]
     assert commands[1][1:3] == ["--proxy", access.proxy_url]
     assert commands[2][1:3] == ["--proxy", access.proxy_url]
+
+
+def test_non_blocking_ytdlp_failure_does_not_enable_proxy(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    commands: list[list[str]] = []
+
+    def fake_run(command, **_kwargs):
+        commands.append(command)
+        raise ExtractionError("source_unavailable", "ERROR: unsupported URL")
+
+    monkeypatch.setattr(extract, "_run", fake_run)
+    access = SourceAccess("http://user__sessid.job:secret@gw.dataimpulse.com:823")
+
+    with pytest.raises(ExtractionError, match="unsupported URL"):
+        access.run_ytdlp(["--dump-single-json", "https://example.com/video"], cwd=tmp_path)
+
+    assert len(commands) == 1
+    assert "--proxy" not in commands[0]
+    assert access.using_proxy is False
