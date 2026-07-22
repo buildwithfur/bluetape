@@ -118,6 +118,35 @@ describe("recipe import lifecycle", () => {
     expect(detail?.steps.map((row) => row.text)).toEqual(["Poach the chicken.", "Cook the rice."]);
   });
 
+  it("returns a unicode recipe title in wiki targets without serializing it as an object key", async () => {
+    const { t, importerId, familyId } = await setup();
+    const importer = asUser(t, importerId);
+    await t.run(async (ctx) => {
+      await ctx.db.insert("recipes", {
+        familyId,
+        title: "Chinese Chicken Stew 中式炖鸡",
+        status: "published",
+        sourceUrl: "https://example.com/stew",
+        normalizedSourceUrl: "https://example.com/stew",
+        sourceDomain: "example.com",
+        sourceType: "website",
+        searchText: "chinese chicken stew",
+        ingredientCount: 0,
+        stepCount: 0,
+        createdBy: importerId,
+        updatedBy: importerId,
+        createdAt: 1,
+        updatedAt: 1,
+      });
+    });
+
+    const targets = await importer.query(api.pages.wikiTargetMap, { familyId });
+
+    expect(targets).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: "chinese chicken stew 中式炖鸡" }),
+    ]));
+  });
+
   it("limits editing and deletion to importer/admin/owner", async () => {
     const { t, importerId, otherId, familyId } = await setup();
     const importer = asUser(t, importerId);

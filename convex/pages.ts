@@ -151,7 +151,9 @@ export const wikiTargetMap = query({
       if (!map[titleKey]) map[titleKey] = target;
       map[`recipe:${recipe._id}`] = target;
     }
-    return map;
+    // Convex object keys are ASCII-only. Titles can be Unicode, so serialize
+    // lookup keys as values and let the client rebuild its in-memory map.
+    return Object.entries(map).map(([key, target]) => ({ key, ...target }));
   },
 });
 

@@ -5,6 +5,7 @@
  (`userProfiles.currentFamilyId`); a user can own/join several families
  and switch between them. Role lives on `familyMembers`, never self-assigned.
 */
+import { useMemo } from 'react'
 import { useQuery, useMutation } from 'convex/react'
 import type { OptimisticLocalStore } from 'convex/browser'
 import { api } from '@convex/_generated/api'
@@ -171,9 +172,15 @@ export function usePageByRecordId(pageId: string | undefined) {
 }
 export function useWikiTargetMap() {
   const familyId = useCurrentFamilyId()
-  return useQuery(
+  const targets = useQuery(
     api.pages.wikiTargetMap,
     familyId ? { familyId } : 'skip',
+  )
+  return useMemo(
+    () => targets === undefined
+      ? undefined
+      : Object.fromEntries(targets.map(({ key, ...target }) => [key, target])),
+    [targets],
   )
 }
 export function useAllTitles() {
