@@ -23,7 +23,7 @@ Each person has **their own login + password** (per-user accounts via `@convex-d
 6. **Wiki links** — `[[Record Name]]` syntax works everywhere content is edited, including recipe ingredients and steps. Notes, rules, and recipes are valid reference targets (a *feature*, not a wiki-app index).
 7. **Shopping** — shared realtime list (its own tab); both users can add; pending items stay until bought; bought items remain checked for the current Singapore day, then leave the active view while remaining in history; creator/admin/owner delete
 8. **i18n by default** — all UI strings use `react-i18next` with English, Indonesian, and Burmese locale files. User content uses an operator-gated, on-demand translation cache: authored text stays authoritative, visible supported fields translate into the viewer's profile locale, and failures fall back to source. Tasks are the first merged entity; PER-3 adds recipe title, ingredients, and steps.
-9. **Auth** — per-user accounts, per-user password; truthful "added by"
+9. **Auth** — per-user accounts through Google OAuth or verified email + password, with email-code password reset; truthful "added by"
 10. **Recipes** — both roles can import a public TikTok, Instagram, YouTube, or website URL; Bluetape extracts structured ingredients + steps, preserves the source, and saves the result after review. Recipes have their own mobile tab and stable detail routes. See `docs/plans/2026-07-22-recipe-import-uiux-plan.md`.
 
 ### Explicitly out of V1
@@ -49,7 +49,7 @@ Each person has **their own login + password** (per-user accounts via `@convex-d
 
 - **Frontend:** React 19 + Vite
 - **Backend / DB / realtime / file storage:** Convex
-- **Auth:** `@convex-dev/auth` with the password provider (per-user accounts, scrypt-hashed)
+- **Auth:** `@convex-dev/auth` with Google OAuth plus the password provider (per-user accounts, scrypt-hashed) and Resend-backed email OTPs for signup verification and password reset
 - **Hosting / CI:** Convex deployment + Cloudflare Pages, auto-deploy on push to `main` via GitHub integration
 - **Recipe media processing:** a Dockerized Python worker on Railway in the Indiego Lab workspace; Convex remains the durable job queue and system of record. See `docs/adr/002-external-recipe-media-worker.md`.
 - **i18n:** `react-i18next` + `i18next` with English, Indonesian, and Burmese locale files. Locale resolves from the per-account profile, then browser language, then English fallback. Supported user-content fields use the operator-gated lazy `contentTranslations` cache.
@@ -347,8 +347,13 @@ Today's checklist                  ← label-caps, tertiary
 - Replaces the need for any browse-all index
 
 ### 6.8 Auth — `/login`
-- Email + password (separate accounts for admins and users)
+- Google OAuth or email + password (separate accounts for admins and users)
+- Google accounts use the verified Google profile email and can link to an existing verified password identity with the same email
 - Submit → `@convex-dev/auth` password provider (scrypt-hashed)
+- Client validation requires a valid email, a display name for signup, and a password of at least 8 characters; backend exceptions are mapped to localized messages rather than displayed raw
+- New accounts must enter a six-digit email verification code before receiving a session; codes expire after 15 minutes and can be resent
+- "Forgot password" sends a separate six-digit email code, then accepts and confirms a new password; the request response does not disclose whether the email has an account
+- Resend delivers verification/reset messages from the deployment-configured `AUTH_EMAIL_FROM`; its API key remains server-only in `AUTH_RESEND_KEY`
 - On success → redirect to Today
 - Failure: inline error below input, `error-text` color
 - The `users` table is managed by `@convex-dev/auth`; our app-level fields (role, locale, displayName) live in a parallel `userProfiles` table keyed by the auth user ID, so we don't fight the auth provider's schema
@@ -541,7 +546,7 @@ Each phase ends with something you can open and tap. No phase ships a half-featu
 - `npm create convex@latest` with React + Vite preset
 - Add `@convex-dev/auth`, tailwind v4, phosphor, markdown-it, fonts
 - Map `DESIGN.md` tokens into `src/theme/tokens.css` + Tailwind `@theme`
-- Convex auth password provider wired; `/login` route with separate per-user accounts for admins and users
+- Convex Auth wired for Google OAuth and password login; `/login` has separate verified-email accounts, client validation, and forgot-password recovery
 - `AppShell` with bottom tab bar (destinations can be empty placeholders)
 - Deploy: app boots, login works, lands on empty "Today"
 
@@ -636,7 +641,7 @@ Each phase ends with something you can open and tap. No phase ships a half-featu
 
 ## 12. Definition of Done (V1)
 
-- [ ] User can log in (own password) and see Today's checklist (routines + tasks due today)
+- [ ] User can sign in with Google or verify a new email account, reset a forgotten password by email code, and see Today's checklist (routines + tasks due today)
 - [ ] Tap a routine row → opens its linked wiki page with photo + local + `[[links]]`
 - [ ] Tap the check-circle → routine or task remains visibly done for today and clears from the active day view tomorrow
 - [ ] Both users can create a note with an optional photo from the phone camera

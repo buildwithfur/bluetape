@@ -85,6 +85,39 @@ When prompted for the site URL, enter the final public URL, such as
 `pages.dev` address and add a custom domain later, rerun this command with the
 custom-domain URL.
 
+Configure Resend so new accounts can verify their email and existing users can
+reset forgotten passwords. The sender must be verified in the Resend account
+(the `onboarding@resend.dev` test sender can only deliver to the account owner):
+
+```sh
+npx convex env set AUTH_RESEND_KEY '<resend-api-key>' --prod
+npx convex env set AUTH_EMAIL_FROM 'Bluetape <auth@your-domain.example>' --prod
+```
+
+Set the same variables without `--prod` on development deployments used to
+exercise real email flows. Authentication codes are six digits and expire
+after 15 minutes.
+
+To enable Google sign-in, create an OAuth 2.0 **Web application** in Google
+Cloud. Add this authorized redirect URI, using the production Convex site URL
+rather than the Cloudflare Pages URL:
+
+```text
+https://<production-deployment>.convex.site/api/auth/callback/google
+```
+
+Then configure its client credentials on the production Convex deployment:
+
+```sh
+npx convex env set AUTH_GOOGLE_ID '<google-client-id>' --prod
+npx convex env set AUTH_GOOGLE_SECRET '<google-client-secret>' --prod
+```
+
+For development, register the equivalent development deployment callback and
+set the same variables without `--prod`. Google accounts with verified email
+addresses can link to an existing verified password account with the same
+email, so a household member does not receive two Bluetape identities.
+
 Create a production deploy key for Cloudflare Pages:
 
 ```sh

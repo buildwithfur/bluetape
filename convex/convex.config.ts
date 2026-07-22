@@ -20,5 +20,12 @@ export default defineApp({
     OPENROUTER_TRANSLATION_MODEL: v.optional(v.string()),
     /** Rotatable bearer secret used only by the external recipe worker. */
     RECIPE_WORKER_SECRET: v.optional(v.string()),
+    /** Resend API key used for auth verification and password-reset emails. */
+    AUTH_RESEND_KEY: v.optional(v.string()),
+    /** Verified Resend sender, for example "Bluetape <auth@example.com>". */
+    AUTH_EMAIL_FROM: v.optional(v.string()),
+    /** Google OAuth web-client credentials. */
+    AUTH_GOOGLE_ID: v.optional(v.string()),
+    AUTH_GOOGLE_SECRET: v.optional(v.string()),
   },
 });
