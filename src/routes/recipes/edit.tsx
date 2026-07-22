@@ -23,7 +23,7 @@ export default function RecipeEdit() {
     return <><TopBar title={t('recipe.edit')} back /><p className="page-px py-10 text-sm text-error-text">{t('recipe.notFound')}</p></>
   }
 
-  const { recipe, ingredients, steps } = data
+  const { recipe, sections } = data
   const authoring = (value: string) => wikiAuthoringText(value, pages, recipes)
   return (
     <>
@@ -31,8 +31,8 @@ export default function RecipeEdit() {
       <RecipeEditor
         initial={{
           title: authoring(recipe.title),
-          ingredients: ingredients.map((item) => authoring(item.text)),
-          steps: steps.map((item) => authoring(item.text)),
+          sections: sections.map((section) => ({ name: section.name, ingredients: section.ingredients.map((item) => authoring(item.text)), steps: section.steps.map((item) => authoring(item.text)) })),
+          notes: recipe.notes ?? '',
         }}
         sourceUrl={recipe.sourceUrl}
         sourceLabel={`${t(`recipe.sourceType.${recipe.sourceType}`)} · ${recipe.sourceDomain}`}

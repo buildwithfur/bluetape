@@ -24,10 +24,17 @@ class ExtractionError(RuntimeError):
         self.code = code
 
 
+class RecipeSection(BaseModel):
+    name: str = Field(default="", max_length=100)
+    ingredients: list[str] = Field(default_factory=list, max_length=100)
+    steps: list[str] = Field(default_factory=list, max_length=100)
+
+
 class RecipeResult(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     ingredients: list[str] = Field(min_length=1, max_length=100)
     steps: list[str] = Field(min_length=1, max_length=100)
+    sections: list[RecipeSection] = Field(default_factory=list, max_length=100)
     sourceName: str | None = Field(default=None, max_length=200)
     sourceImageUrl: str | None = Field(default=None, max_length=2000)
     sourceLanguage: str | None = Field(default=None, max_length=35)
@@ -269,6 +276,23 @@ def _instruction_text(value: Any) -> list[str]:
     return []
 
 
+def _instruction_sections(value: Any) -> list[RecipeSection]:
+    if not isinstance(value, list):
+        return []
+    sections: list[RecipeSection] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        kinds = item.get("@type")
+        kinds = kinds if isinstance(kinds, list) else [kinds]
+        if any(str(kind).lower() == "howtosection" for kind in kinds):
+            name = str(item.get("name") or "").strip()
+            steps = [text.strip() for text in _instruction_text(item.get("itemListElement")) if text.strip()]
+            if name and steps:
+                sections.append(RecipeSection(name=name, steps=steps))
+    return sections
+
+
 def _recipe_nodes(value: Any) -> list[dict[str, Any]]:
     if isinstance(value, list):
         return [node for item in value for node in _recipe_nodes(item)]
@@ -291,7 +315,10 @@ def extract_recipe_schema(html: str) -> RecipeResult | None:
             continue
         for node in _recipe_nodes(payload):
             ingredients = [str(item).strip() for item in node.get("recipeIngredient", []) if str(item).strip()]
+            sections = _instruction_sections(node.get("recipeInstructions"))
             steps = [item.strip() for item in _instruction_text(node.get("recipeInstructions")) if item.strip()]
+            if sections:
+                steps = [step for section in sections for step in section.steps]
             title = str(node.get("name") or "").strip()
             if not title or not ingredients or not steps:
                 continue
@@ -308,6 +335,7 @@ def extract_recipe_schema(html: str) -> RecipeResult | None:
                     title=title,
                     ingredients=ingredients,
                     steps=steps,
+                    sections=sections,
                     sourceName=str(author).strip() if author else None,
                     sourceImageUrl=str(image).strip() if image else None,
                 )

@@ -31,6 +31,35 @@ def test_extracts_recipe_json_ld() -> None:
     assert recipe.steps == ["Cook the rice."]
 
 
+def test_preserves_named_json_ld_instruction_sections() -> None:
+    payload = {
+        "@context": "https://schema.org",
+        "@type": "Recipe",
+        "name": "Nasi Lemak",
+        "recipeIngredient": ["2 cups rice", "1 cup coconut milk", "Dried chilies"],
+        "recipeInstructions": [
+            {
+                "@type": "HowToSection",
+                "name": "Coconut Rice",
+                "itemListElement": [{"@type": "HowToStep", "text": "Cook the rice."}],
+            },
+            {
+                "@type": "HowToSection",
+                "name": "Sambal",
+                "itemListElement": [{"@type": "HowToStep", "text": "Fry the sambal."}],
+            },
+        ],
+    }
+    html = f'<script type="application/ld+json">{json.dumps(payload)}</script>'
+
+    recipe = extract_recipe_schema(html)
+
+    assert recipe is not None
+    assert [section.name for section in recipe.sections] == ["Coconut Rice", "Sambal"]
+    assert recipe.sections[0].steps == ["Cook the rice."]
+    assert recipe.sections[1].steps == ["Fry the sambal."]
+
+
 def test_extracts_absolute_source_page_image() -> None:
     html = '<meta property="og:image" content="/images/curry.jpg">'
 

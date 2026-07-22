@@ -243,6 +243,8 @@
   "common.confirmDeleteShopping": "Hapus barang belanja ini? Tindakan ini tidak dapat dibatalkan.",
   "common.deleteShoppingFailed": "Barang belanja ini tidak dapat dihapus. Silakan coba lagi.",
   "recipe.title": "Resep",
+  "recipe.componentName": "Nama komponen (opsional)",
+  "recipe.addComponent": "Tambah komponen",
   "recipe.detail": "Resep",
   "recipe.edit": "Edit resep",
   "recipe.recipes": "Resep",

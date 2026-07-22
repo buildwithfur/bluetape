@@ -25,7 +25,20 @@ const workerStageValidator = v.union(
 );
 
 const MAX_ITEMS = 100;
+const MAX_SECTION_NAME_LENGTH = 100;
 const LEASE_MS = 5 * 60 * 1000;
+
+const recipeSectionValidator = v.object({
+  name: v.string(),
+  ingredients: v.array(v.string()),
+  steps: v.array(v.string()),
+});
+
+type RecipeSectionInput = {
+  name: string;
+  ingredients: string[];
+  steps: string[];
+};
 const CURRENT_PIPELINE_VERSION = 3;
 const TRACKING_PARAMS = new Set([
   "fbclid", "gclid", "igsh", "igshid", "si", "feature",
@@ -99,6 +112,36 @@ function cleanItems(values: string[], kind: "ingredient" | "step"): string[] {
   return items;
 }
 
+function cleanSections(sections: RecipeSectionInput[]): RecipeSectionInput[] {
+  const names = new Set<string>();
+  const cleaned = sections.map((section) => {
+    const name = section.name.trim();
+    if (name.length > MAX_SECTION_NAME_LENGTH) throw new Error("Recipe section name is too long");
+    const key = name.toLocaleLowerCase();
+    if (names.has(key)) throw new Error("Recipe section names must be unique");
+    names.add(key);
+    return {
+      name,
+      ingredients: section.ingredients.map((value) => value.trim()).filter(Boolean),
+      steps: section.steps.map((value) => value.trim()).filter(Boolean),
+    };
+  }).filter((section) => section.name || section.ingredients.length || section.steps.length);
+  const ingredientCount = cleaned.reduce((total, section) => total + section.ingredients.length, 0);
+  const stepCount = cleaned.reduce((total, section) => total + section.steps.length, 0);
+  if (ingredientCount === 0) throw new Error("Add at least one ingredient");
+  if (stepCount === 0) throw new Error("Add at least one step");
+  if (ingredientCount > MAX_ITEMS || stepCount > MAX_ITEMS) throw new Error("Recipe has too many rows");
+  for (const section of cleaned) {
+    if (section.ingredients.length) cleanItems(section.ingredients, "ingredient");
+    if (section.steps.length) cleanItems(section.steps, "step");
+  }
+  return cleaned;
+}
+
+function legacySections(ingredients: string[], steps: string[]): RecipeSectionInput[] {
+  return [{ name: "", ingredients, steps }];
+}
+
 async function childrenFor(ctx: QueryCtx | MutationCtx, recipeId: Id<"recipes">) {
   const [ingredients, steps] = await Promise.all([
     ctx.db.query("recipeIngredients")
@@ -108,37 +151,32 @@ async function childrenFor(ctx: QueryCtx | MutationCtx, recipeId: Id<"recipes">)
       .withIndex("by_recipe_and_sort_order", (q) => q.eq("recipeId", recipeId))
       .take(MAX_ITEMS + 1),
   ]);
-  if (ingredients.length > MAX_ITEMS || steps.length > MAX_ITEMS) {
-    throw new Error("Recipe has too many rows");
-  }
-  return { ingredients, steps };
+  if (ingredients.length > MAX_ITEMS || steps.length > MAX_ITEMS) throw new Error("Recipe has too many rows");
+  const names = [...ingredients, ...steps].map((row) => row.section ?? "");
+  const sections = [...new Set(names)].map((name) => ({
+    name,
+    ingredients: ingredients.filter((row) => (row.section ?? "") === name),
+    steps: steps.filter((row) => (row.section ?? "") === name),
+  }));
+  return { ingredients, steps, sections };
 }
 
-async function replaceChildren(
-  ctx: MutationCtx,
-  recipe: Doc<"recipes">,
-  ingredients: string[],
-  steps: string[],
-) {
+async function replaceChildren(ctx: MutationCtx, recipe: Doc<"recipes">, sections: RecipeSectionInput[]) {
   const existing = await childrenFor(ctx, recipe._id);
-  for (const row of [...existing.ingredients, ...existing.steps]) {
-    await ctx.db.delete(row._id);
-  }
-  for (const [sortOrder, text] of ingredients.entries()) {
-    await ctx.db.insert("recipeIngredients", {
-      familyId: recipe.familyId,
-      recipeId: recipe._id,
-      text,
-      sortOrder,
-    });
-  }
-  for (const [sortOrder, text] of steps.entries()) {
-    await ctx.db.insert("recipeSteps", {
-      familyId: recipe.familyId,
-      recipeId: recipe._id,
-      text,
-      sortOrder,
-    });
+  for (const row of [...existing.ingredients, ...existing.steps]) await ctx.db.delete(row._id);
+  let ingredientSortOrder = 0;
+  let stepSortOrder = 0;
+  for (const section of sections) {
+    for (const text of section.ingredients) {
+      await ctx.db.insert("recipeIngredients", {
+        familyId: recipe.familyId, recipeId: recipe._id, section: section.name || undefined, text, sortOrder: ingredientSortOrder++,
+      });
+    }
+    for (const text of section.steps) {
+      await ctx.db.insert("recipeSteps", {
+        familyId: recipe.familyId, recipeId: recipe._id, section: section.name || undefined, text, sortOrder: stepSortOrder++,
+      });
+    }
   }
 }
 
@@ -333,8 +371,10 @@ export const publish = mutation({
   args: {
     jobId: v.id("recipeImportJobs"),
     title: v.string(),
-    ingredients: v.array(v.string()),
-    steps: v.array(v.string()),
+    sections: v.optional(v.array(recipeSectionValidator)),
+    ingredients: v.optional(v.array(v.string())),
+    steps: v.optional(v.array(v.string())),
+    notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const job = await ctx.db.get(args.jobId);
@@ -343,60 +383,52 @@ export const publish = mutation({
     if (!recipe) throw new Error("Recipe draft not found");
     const access = await requireFamilyMember(ctx, recipe.familyId);
     if (!canManage(recipe, access)) throw new Error("You cannot publish this recipe");
+    const rawSections = args.sections ?? legacySections(args.ingredients ?? [], args.steps ?? []);
+    const sections = cleanSections(rawSections);
+    const canonicalSections = await Promise.all(sections.map(async (section) => ({
+      ...section,
+      ingredients: await Promise.all(section.ingredients.map((item) => canonicalizeWikiReferences(ctx, recipe.familyId, item))),
+      steps: await Promise.all(section.steps.map((item) => canonicalizeWikiReferences(ctx, recipe.familyId, item))),
+    })));
     const title = await canonicalizeWikiReferences(ctx, recipe.familyId, cleanTitle(args.title));
-    const ingredients = await Promise.all(cleanItems(args.ingredients, "ingredient").map((item) =>
-      canonicalizeWikiReferences(ctx, recipe.familyId, item)));
-    const steps = await Promise.all(cleanItems(args.steps, "step").map((item) =>
-      canonicalizeWikiReferences(ctx, recipe.familyId, item)));
-    await replaceChildren(ctx, recipe, ingredients, steps);
+    const notes = args.notes?.trim() || undefined;
+    await replaceChildren(ctx, recipe, canonicalSections);
+    const ingredients = canonicalSections.flatMap((section) => section.ingredients);
+    const steps = canonicalSections.flatMap((section) => section.steps);
     const now = Date.now();
     await ctx.db.patch(recipe._id, {
-      title,
-      status: "published",
-      searchText: `${title}\n${ingredients.join("\n")}`.toLowerCase(),
-      ingredientCount: ingredients.length,
-      stepCount: steps.length,
-      updatedBy: access.userId,
-      updatedAt: now,
-      reviewedAt: now,
+      title, notes, status: "published", searchText: `${title}\n${ingredients.join("\n")}\n${notes ?? ""}`.toLowerCase(),
+      ingredientCount: ingredients.length, stepCount: steps.length, updatedBy: access.userId, updatedAt: now, reviewedAt: now,
     });
-    await ctx.db.patch(job._id, {
-      status: "published",
-      stage: "published",
-      leaseToken: undefined,
-      leaseExpiresAt: undefined,
-      updatedAt: now,
-    });
+    await ctx.db.patch(job._id, { status: "published", stage: "published", leaseToken: undefined, leaseExpiresAt: undefined, updatedAt: now });
     return recipe._id;
   },
 });
 
 export const update = mutation({
   args: {
-    recipeId: v.id("recipes"),
-    title: v.string(),
-    ingredients: v.array(v.string()),
-    steps: v.array(v.string()),
+    recipeId: v.id("recipes"), title: v.string(), sections: v.optional(v.array(recipeSectionValidator)),
+    ingredients: v.optional(v.array(v.string())), steps: v.optional(v.array(v.string())), notes: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const recipe = await ctx.db.get(args.recipeId);
     if (!recipe) throw new Error("Recipe not found");
     const access = await requireFamilyMember(ctx, recipe.familyId);
     if (!canManage(recipe, access)) throw new Error("You cannot edit this recipe");
+    const sections = cleanSections(args.sections ?? legacySections(args.ingredients ?? [], args.steps ?? []));
+    const canonicalSections = await Promise.all(sections.map(async (section) => ({
+      ...section,
+      ingredients: await Promise.all(section.ingredients.map((item) => canonicalizeWikiReferences(ctx, recipe.familyId, item))),
+      steps: await Promise.all(section.steps.map((item) => canonicalizeWikiReferences(ctx, recipe.familyId, item))),
+    })));
     const title = await canonicalizeWikiReferences(ctx, recipe.familyId, cleanTitle(args.title));
-    const ingredients = await Promise.all(cleanItems(args.ingredients, "ingredient").map((item) =>
-      canonicalizeWikiReferences(ctx, recipe.familyId, item)));
-    const steps = await Promise.all(cleanItems(args.steps, "step").map((item) =>
-      canonicalizeWikiReferences(ctx, recipe.familyId, item)));
-    await replaceChildren(ctx, recipe, ingredients, steps);
+    const notes = args.notes?.trim() || undefined;
+    await replaceChildren(ctx, recipe, canonicalSections);
+    const ingredients = canonicalSections.flatMap((section) => section.ingredients);
+    const steps = canonicalSections.flatMap((section) => section.steps);
     await ctx.db.patch(recipe._id, {
-      title,
-      searchText: `${title}\n${ingredients.join("\n")}`.toLowerCase(),
-      ingredientCount: ingredients.length,
-      stepCount: steps.length,
-      updatedBy: access.userId,
-      updatedAt: Date.now(),
-      manuallyEditedAt: Date.now(),
+      title, notes, searchText: `${title}\n${ingredients.join("\n")}\n${notes ?? ""}`.toLowerCase(),
+      ingredientCount: ingredients.length, stepCount: steps.length, updatedBy: access.userId, updatedAt: Date.now(), manuallyEditedAt: Date.now(),
     });
     return recipe._id;
   },
@@ -500,14 +532,9 @@ export const updateWorkerStage = internalMutation({
 
 export const completeWorkerDraft = internalMutation({
   args: {
-    jobId: v.id("recipeImportJobs"),
-    leaseToken: v.string(),
-    title: v.string(),
-    ingredients: v.array(v.string()),
-    steps: v.array(v.string()),
-    sourceName: v.optional(v.string()),
-    sourceImageUrl: v.optional(v.string()),
-    sourceLanguage: v.optional(v.string()),
+    jobId: v.id("recipeImportJobs"), leaseToken: v.string(), title: v.string(),
+    sections: v.optional(v.array(recipeSectionValidator)), ingredients: v.optional(v.array(v.string())), steps: v.optional(v.array(v.string())),
+    sourceName: v.optional(v.string()), sourceImageUrl: v.optional(v.string()), sourceLanguage: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const job = await ctx.db.get(args.jobId);
@@ -515,28 +542,21 @@ export const completeWorkerDraft = internalMutation({
     const recipe = await ctx.db.get(job.recipeId);
     if (!recipe) throw new Error("Recipe draft not found");
     const title = cleanTitle(args.title);
-    const ingredients = cleanItems(args.ingredients, "ingredient");
-    const steps = cleanItems(args.steps, "step");
-    await replaceChildren(ctx, recipe, ingredients, steps);
+    const sections = cleanSections(args.sections
+      ? [{ name: "", ingredients: args.ingredients ?? [], steps: [] }, ...args.sections]
+      : legacySections(args.ingredients ?? [], args.steps ?? []));
+    await replaceChildren(ctx, recipe, sections);
+    const ingredients = sections.flatMap((section) => section.ingredients);
+    const steps = sections.flatMap((section) => section.steps);
     const now = Date.now();
     await ctx.db.patch(recipe._id, {
-      title,
-      sourceName: args.sourceName?.trim() || undefined,
-      sourceImageUrl: args.sourceImageUrl?.trim() || undefined,
-      sourceLanguage: args.sourceLanguage?.trim() || undefined,
-      searchText: `${title}\n${ingredients.join("\n")}`.toLowerCase(),
-      ingredientCount: ingredients.length,
-      stepCount: steps.length,
-      updatedAt: now,
+      title, sourceName: args.sourceName?.trim() || undefined, sourceImageUrl: args.sourceImageUrl?.trim() || undefined,
+      sourceLanguage: args.sourceLanguage?.trim() || undefined, searchText: `${title}\n${ingredients.join("\n")}`.toLowerCase(),
+      ingredientCount: ingredients.length, stepCount: steps.length, updatedAt: now,
     });
     await ctx.db.patch(job._id, {
-      status: "needs_review",
-      stage: "needs_review",
-      leaseToken: undefined,
-      leaseExpiresAt: undefined,
-      lastErrorCode: undefined,
-      lastErrorMessage: undefined,
-      updatedAt: now,
+      status: "needs_review", stage: "needs_review", leaseToken: undefined, leaseExpiresAt: undefined,
+      lastErrorCode: undefined, lastErrorMessage: undefined, updatedAt: now,
     });
     return null;
   },

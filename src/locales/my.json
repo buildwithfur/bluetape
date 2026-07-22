@@ -243,6 +243,8 @@
   "common.confirmDeleteShopping": "ဤဈေးဝယ်ပစ္စည်းကို ဖျက်မည်လား။ ပြန်ယူ၍မရပါ။",
   "common.deleteShoppingFailed": "ဤဈေးဝယ်ပစ္စည်းကို မဖျက်နိုင်ပါ။ ထပ်စမ်းပါ။",
   "recipe.title": "ချက်နည်းများ",
+  "recipe.componentName": "အစိတ်အပိုင်းအမည် (ရွေးချယ်နိုင်)",
+  "recipe.addComponent": "အစိတ်အပိုင်း ထည့်ရန်",
   "recipe.detail": "ချက်နည်း",
   "recipe.edit": "ချက်နည်း ပြင်ရန်",
   "recipe.recipes": "ချက်နည်းများ",

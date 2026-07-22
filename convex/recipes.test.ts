@@ -118,6 +118,32 @@ describe("recipe import lifecycle", () => {
     expect(detail?.steps.map((row) => row.text)).toEqual(["Poach the chicken.", "Cook the rice."]);
   });
 
+  it("preserves named recipe components for multi-part recipes", async () => {
+    const { t, importerId, familyId } = await setup();
+    const importer = asUser(t, importerId);
+    const created = await importer.mutation(api.recipes.createImport, {
+      familyId,
+      url: "https://example.com/nasi-lemak",
+    });
+    const claim = await t.mutation(internal.recipes.claimNext, { workerId: "test-worker" });
+    if (!claim || !created.jobId) throw new Error("Expected import job");
+    const sections = [
+      { name: "Coconut Rice", ingredients: ["2 cups rice", "1 cup coconut milk"], steps: ["Cook the rice."] },
+      { name: "Sambal", ingredients: ["Dried chilies", "Shallots"], steps: ["Blend and fry the sambal."] },
+    ];
+    await t.mutation(internal.recipes.completeWorkerDraft, {
+      jobId: claim.jobId,
+      leaseToken: claim.leaseToken,
+      title: "Nasi Lemak",
+      sections,
+    });
+
+    const detail = await importer.query(api.recipes.getImport, { jobId: created.jobId });
+    expect(detail?.sections.map((section) => section.name)).toEqual(["Coconut Rice", "Sambal"]);
+    expect(detail?.sections[1]?.ingredients.map((ingredient) => ingredient.text)).toEqual(["Dried chilies", "Shallots"]);
+    expect(detail?.sections[0]?.steps.map((step) => step.text)).toEqual(["Cook the rice."]);
+  });
+
   it("returns a unicode recipe title in wiki targets without serializing it as an object key", async () => {
     const { t, importerId, familyId } = await setup();
     const importer = asUser(t, importerId);

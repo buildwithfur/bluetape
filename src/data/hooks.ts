@@ -228,8 +228,8 @@ export function usePublishRecipe() {
   return (input: {
     jobId: Id<'recipeImportJobs'>
     title: string
-    ingredients: string[]
-    steps: string[]
+    sections: { name: string; ingredients: string[]; steps: string[] }[]
+    notes: string
   }) => publish(input)
 }
 export function useUpdateRecipe() {
@@ -237,8 +237,8 @@ export function useUpdateRecipe() {
   return (input: {
     recipeId: Id<'recipes'>
     title: string
-    ingredients: string[]
-    steps: string[]
+    sections: { name: string; ingredients: string[]; steps: string[] }[]
+    notes: string
   }) => update(input)
 }
 export function useDeleteRecipe() {

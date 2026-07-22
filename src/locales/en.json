@@ -243,6 +243,8 @@
   "common.confirmDeleteShopping": "Delete this shopping item? This can't be undone.",
   "common.deleteShoppingFailed": "Could not delete this shopping item. Please try again.",
   "recipe.title": "Recipes",
+  "recipe.componentName": "Component name (optional)",
+  "recipe.addComponent": "Add component",
   "recipe.detail": "Recipe",
   "recipe.edit": "Edit recipe",
   "recipe.recipes": "Recipes",

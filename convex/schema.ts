@@ -135,6 +135,8 @@ export default defineSchema({
     sourceImageUrl: v.optional(v.string()),
     /** Language detected in the external recipe evidence before import translation. */
     sourceLanguage: v.optional(v.string()),
+    /** Optional free-form serving, storage, and substitution notes. */
+    notes: v.optional(v.string()),
     searchText: v.string(),
     ingredientCount: v.number(),
     stepCount: v.number(),
@@ -152,6 +154,8 @@ export default defineSchema({
   recipeIngredients: defineTable({
     familyId: v.id("families"),
     recipeId: v.id("recipes"),
+    // Optional so existing flat recipes stay readable without a migration.
+    section: v.optional(v.string()),
     text: v.string(),
     sortOrder: v.number(),
   })
@@ -161,6 +165,8 @@ export default defineSchema({
   recipeSteps: defineTable({
     familyId: v.id("families"),
     recipeId: v.id("recipes"),
+    // Optional so existing flat recipes stay readable without a migration.
+    section: v.optional(v.string()),
     text: v.string(),
     sortOrder: v.number(),
   })

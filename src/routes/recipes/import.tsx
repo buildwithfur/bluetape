@@ -35,7 +35,7 @@ export default function RecipeImport() {
     return <><TopBar title={t('recipe.import.title')} back /><p className="page-px py-10 text-sm text-error-text">{t('recipe.import.notFound')}</p></>
   }
 
-  const { job, recipe, ingredients, steps } = data
+  const { job, recipe, sections } = data
   if (job.status === 'needs_review') {
     const sourceLanguage = recipe.sourceLanguage?.trim()
     const sourceLanguageName = sourceLanguage
@@ -53,8 +53,8 @@ export default function RecipeImport() {
       : undefined
     const initial: RecipeDraft = {
       title: recipe.title,
-      ingredients: ingredients.map((item) => item.text),
-      steps: steps.map((item) => item.text),
+      sections: sections.map((section) => ({ name: section.name, ingredients: section.ingredients.map((item) => item.text), steps: section.steps.map((item) => item.text) })),
+      notes: recipe.notes ?? '',
     }
     return (
       <>

@@ -107,6 +107,7 @@ recipeWorkerRoute("/recipe-worker/complete", async (ctx, body) =>
     jobId: body.jobId,
     leaseToken: body.leaseToken,
     title: body.title,
+    sections: body.sections,
     ingredients: body.ingredients,
     steps: body.steps,
     sourceName: body.sourceName,
