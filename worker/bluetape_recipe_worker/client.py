@@ -12,6 +12,7 @@ class ClaimedJob:
     recipe_id: str
     source_url: str
     source_type: str
+    target_locale: str
     lease_token: str
 
 
@@ -40,6 +41,7 @@ class ConvexWorkerClient:
             recipe_id=data["recipeId"],
             source_url=data["sourceUrl"],
             source_type=data["sourceType"],
+            target_locale=data["targetLocale"],
             lease_token=data["leaseToken"],
         )
 

@@ -212,6 +212,10 @@ export function useRetryRecipeImport() {
   const retry = useMutation(api.recipes.retryImport)
   return (jobId: Id<'recipeImportJobs'>) => retry({ jobId })
 }
+export function useDiscardRecipeImport() {
+  const discard = useMutation(api.recipes.discardImport)
+  return (jobId: Id<'recipeImportJobs'>) => discard({ jobId })
+}
 export function usePublishRecipe() {
   const publish = useMutation(api.recipes.publish)
   return (input: {

@@ -580,10 +580,10 @@ Each phase ends with something you can open and tap. No phase ships a half-featu
 ### Phase 5 — Recipe import
 - Add Recipes to the five-tab mobile shell and desktop rail
 - Add persistent URL import jobs for social-video and website sources
-- Add the external Docker media worker (`yt-dlp`, FFmpeg/FFprobe, Deno) with authenticated Convex job claiming and stage updates
+- Add the external Docker media worker (`yt-dlp`, `gallery-dl`, FFmpeg/FFprobe, Deno) with authenticated Convex job claiming and stage updates
 - Add structured draft review, recipe detail/edit, source provenance, retry, and delete flows
 - Add recipes to global search and complete i18n/a11y/error-state coverage
-- Extend the merged lazy user-content translation cache to recipe title, ingredient rows, and step rows; review/edit remains source-only
+- Keep an imported recipe's source-language title canonical while normalizing ingredient rows and step rows into the importer's profile locale before review; detail shows a viewer-localized title beneath the original and localizes content through the merged lazy translation cache
 - **Checkpoint:** either family role can paste a supported public recipe link, review extracted ingredients + steps, save it, and reopen both the Bluetape recipe and its original source.
 
 ---
@@ -621,8 +621,8 @@ Each phase ends with something you can open and tap. No phase ships a half-featu
 29. **Recipes are structured first-class records, not generic markdown pages.** Import creates a persistent draft, preserves the source, and requires a review of extracted ingredients + ordered steps before publish. Social sources use caption/description + transcript; websites prefer Recipe schema and fall back to LLM extraction.
 30. **Recipe permissions follow authorship.** Both roles can import and view; the importer, a family admin, or the owner can edit/delete. Convex mutations enforce the same rules the UI presents.
 31. **Recipes participate in stable wiki references without becoming generic pages.** Authors type `[[Recipe Title]]`; selection canonicalizes the target to recipe identity and renders `/recipes/:id`. Recipe ingredients and steps also support the same references.
-32. **Recipe media processing runs on Railway in the Indiego Lab workspace.** Convex remains the authenticated durable queue and system of record; a Dockerized Python worker claims jobs and runs `yt-dlp`, FFmpeg/FFprobe, Deno, transcription, and structured extraction. `gallery-dl` is deferred until fixtures prove a need. See ADR 002.
-33. **Recipe text is part of user-content translation.** The reviewed source title, ingredient rows, and step rows remain authoritative. Viewer-localized results use the existing lazy cache and feature gate; review/edit never modifies generated translations.
+32. **Recipe media processing runs on Railway in the Indiego Lab workspace.** Convex remains the authenticated durable queue and system of record; a Dockerized Python worker claims jobs and runs `yt-dlp`, `gallery-dl`, FFmpeg/FFprobe, Deno, transcription, and structured extraction. Caption metadata is assessed before media; `gallery-dl` is the bounded Instagram carousel-image fallback. See ADR 002.
+33. **Recipe identity stays in the source language while content translates per viewer.** The worker keeps the extracted source-language title as the canonical recipe name and translates only the fixed ingredient and step fields into the importing profile's locale without changing quantities or structure. Detail always leads with the original title and, when available, shows the viewer-localized title beneath it. Other viewer-localized content uses the existing lazy cache and feature gate; Edit modifies the authoritative original title and reviewed ingredient/step text.
 
 ## 11. Still Open
 
@@ -658,7 +658,7 @@ Each phase ends with something you can open and tap. No phase ships a half-featu
 - [ ] Imported recipes require review of title, ingredients, and ordered steps before publish and always retain an openable source link
 - [ ] Published recipes have stable detail URLs and appear in global search
 - [ ] Recipes appear in `[[` suggestions, links to them survive renames, and recipe ingredients/steps can link to notes, rules, or recipes
-- [ ] Recipe title, ingredients, and steps use the existing operator-gated lazy user-content translation cache; source appears immediately and remains the only editable text
+- [ ] Imported recipes retain the original-language title, translate ingredients and steps into the importer's locale for review, record the external source language, and show a viewer-localized title beneath the original on detail
 - [ ] All UI strings route through `react-i18next` `t()` with matching English, Indonesian, and Burmese keys; no hard-coded English appears in components
 - [ ] All screens meet DESIGN.md tokens, contrast, and the no-nested-containers rule
 - [ ] Passes `prefers-reduced-motion` and tap-target ≥44px checks

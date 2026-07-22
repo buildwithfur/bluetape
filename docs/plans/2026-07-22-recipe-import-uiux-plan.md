@@ -157,7 +157,7 @@ This can take a little while. You can leave this screen.
 ```
 
 - Create the import record before processing starts, then navigate to its stable progress route.
-- Social stages: source found → reading caption → transcribing video → organizing recipe.
+- Social stages: source found → reading caption/subtitles → transcribing only if needed → checking visual details only if needed → organizing recipe.
 - Website stages: source found → checking recipe data → reading page if needed → organizing recipe.
 - Only show stages confirmed by backend state. Use an indeterminate marker for the active stage; do not animate a fake percentage.
 - The job continues if the user navigates away. Its list row shows the current stage and reopens this route.
@@ -285,13 +285,17 @@ The raw caption, description, transcript, schema payload, and extraction diagnos
 
 Convex owns authentication, family permissions, `recipeImportJobs`, recipe records, retry/lease state, and realtime progress. A separate Docker media worker claims queued jobs from authenticated Convex HTTP endpoints and performs source extraction, transcription, and structured LLM parsing.
 
-The accepted MVP deployment is a long-lived Railway worker in the dedicated **bluetape** project (`8f3dbd79-5e5a-414e-b6f4-38b9b12a0c5b`) under the Indiego Lab workspace, built from the same Dockerfile used locally. Its base toolchain is Python 3.12, `yt-dlp[default]`, `ffmpeg`/`ffprobe`, and Deno. `gallery-dl` is deferred until Instagram carousel/image fixtures prove it is necessary. See `docs/adr/002-external-recipe-media-worker.md` for the lifecycle, deployment tradeoff, and security constraints.
+The accepted MVP deployment is a long-lived Railway worker in the dedicated **bluetape** project (`8f3dbd79-5e5a-414e-b6f4-38b9b12a0c5b`) under the Indiego Lab workspace, built from the same Dockerfile used locally. Its base toolchain is Python 3.12, `yt-dlp[default]`, `gallery-dl`, `ffmpeg`/`ffprobe`, and Deno. Post-level caption metadata is always assessed first; `gallery-dl` runs only for an Instagram carousel whose text evidence is incomplete. Login-gated sources show an explicit access failure and can be cleared by the importer. See `docs/adr/002-external-recipe-media-worker.md` for the lifecycle, deployment tradeoff, and security constraints.
 
 ## 9. User-content translation
 
-Recipes extend the lazy translation cache merged on `main`; they do not introduce translated fields or translation work inside the import pipeline.
+Recipes extend the lazy translation cache merged on `main` and also localize external imports before review.
 
-- The reviewed/imported recipe is the authoritative source. Review and Edit always show and save that source.
+- Snapshot the importing user's profile locale on the durable import job.
+- Extract and assess the recipe in the external evidence language first. Keep that source-language title as the canonical recipe identity. Only after the structure is sufficient, translate the fixed ingredient and step rows into the importer locale with immutable field IDs so translation cannot add, remove, merge, split, or reorder recipe content.
+- Record the detected external `sourceLanguage` and show a quiet “Ingredients and steps translated from {language}” note during review when it differs from the target locale.
+- The original title plus localized, reviewed ingredients and steps become the authoritative source. Edit always shows and saves those authoritative fields.
+- Recipe cards show only the canonical original title. Detail leads with that title and shows the current viewer's translated title directly beneath it when available.
 - When a viewer has `userProfiles.autoTranslateEnabled === true`, the recipe detail requests current translations for the viewer's profile locale and shows source text immediately while missing work runs.
 - Translate recipe title in `label` mode, ingredient text in a concise quantity-preserving mode, and step text in `instruction` mode.
 - Source name, platform label, source URL, timestamps, and import diagnostics are not user-content translation fields.
@@ -330,7 +334,7 @@ Generalize `useLocalizedTaskFields` into a typed `useLocalizedFields` hook and r
 - Build the structured ingredient/step review editor.
 - Support partial extraction, missing-section guidance, retry, and draft retention.
 - Publish to a stable `/recipes/:id` route.
-- Register recipe title, ingredient, and step source fields with the existing lazy translation cache without translating during import/save.
+- Keep the imported title in its source language, translate ingredients and steps into the importer's locale before review, and register all three field types with the existing lazy per-viewer cache.
 
 ### Phase 3 — Recipe reading and management
 
@@ -357,6 +361,6 @@ Generalize `useLocalizedTaskFields` into a typed `useLocalizedFields` hook and r
 - Duplicate normalized source URLs point to the existing recipe instead of silently duplicating it.
 - Recipe results appear in global search.
 - Permission-aware edit/delete controls match server enforcement.
-- With database-controlled auto-translation enabled, recipe title, ingredients, and steps localize on demand while review/edit retain the exact source and Show original remains available.
+- With database-controlled auto-translation enabled, detail shows the viewer-localized title beneath the canonical original title; ingredients and steps localize on demand and retain Show original.
 - Every new string is translated through `t()` in every shipped locale file.
 - 320px mobile, keyboard navigation, tap targets, reduced motion, and empty/loading/error states pass review.

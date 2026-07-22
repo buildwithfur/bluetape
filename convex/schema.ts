@@ -133,6 +133,8 @@ export default defineSchema({
     sourceDomain: v.string(),
     sourceName: v.optional(v.string()),
     sourceImageUrl: v.optional(v.string()),
+    /** Language detected in the external recipe evidence before import translation. */
+    sourceLanguage: v.optional(v.string()),
     searchText: v.string(),
     ingredientCount: v.number(),
     stepCount: v.number(),
@@ -178,6 +180,10 @@ export default defineSchema({
       v.literal("website"),
     ),
     sourceDomain: v.string(),
+    /** Snapshot of the importing user's locale. Optional for pre-migration jobs. */
+    targetLocale: v.optional(v.string()),
+    /** Lets stale review drafts be reprocessed after extraction semantics change. */
+    pipelineVersion: v.optional(v.number()),
     createdBy: v.id("users"),
     status: v.union(
       v.literal("queued"),

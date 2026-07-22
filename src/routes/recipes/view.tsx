@@ -56,7 +56,10 @@ export default function RecipeView() {
   if (data === null) return <><TopBar title={t('recipe.detail')} back /><p className="page-px py-10 text-sm text-error-text">{t('recipe.notFound')}</p></>
 
   const { recipe, ingredients, steps, canManage } = data
-  const title = showOriginal ? recipe.title : localizedTitle.textFor({ entityType: 'recipe', entityId: recipe._id, field: 'title', source: recipe.title })
+  const translatedTitle = localizedTitle.textFor({ entityType: 'recipe', entityId: recipe._id, field: 'title', source: recipe.title })
+  const hasTranslatedTitle = localizedTitle.enabled &&
+    localizedTitle.hasTranslation({ entityType: 'recipe', entityId: recipe._id, field: 'title' }) &&
+    translatedTitle !== recipe.title
   return (
     <>
       <TopBar
@@ -95,7 +98,12 @@ export default function RecipeView() {
       />
       <article className="page-px pb-12 pt-6">
         <header>
-          <h1 className="max-w-[22ch] text-[32px] font-semibold leading-[1.08] tracking-[-0.025em] text-ink">{title}</h1>
+          <h1 className="max-w-[22ch] text-[32px] font-semibold leading-[1.08] tracking-[-0.025em] text-ink">{recipe.title}</h1>
+          {hasTranslatedTitle && (
+            <p className="mt-2 max-w-[28ch] font-local-script text-[20px] font-medium leading-snug text-text-secondary">
+              {translatedTitle}
+            </p>
+          )}
           <p className="mt-3 mono-sm text-text-tertiary">{t('recipe.meta', { ingredients: recipe.ingredientCount, steps: recipe.stepCount })}</p>
           <div className="mt-4 flex min-h-11 items-center justify-between gap-3 border-y border-border-subtle py-2">
             <span className="min-w-0 truncate text-sm text-text-secondary">{t(`recipe.sourceType.${recipe.sourceType}`)}{recipe.sourceName ? ` · ${recipe.sourceName}` : ` · ${recipe.sourceDomain}`}</span>

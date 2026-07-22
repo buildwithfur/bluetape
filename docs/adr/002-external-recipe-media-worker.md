@@ -30,14 +30,17 @@ The initial image contains:
 
 - Python 3.12
 - `yt-dlp[default]`
+- `gallery-dl` for bounded Instagram carousel-image fallback
 - `ffmpeg` and `ffprobe`
 - Deno for `yt-dlp-ejs` / current YouTube JavaScript challenges
 - an HTTP client and HTML/JSON-LD parser
 - the transcription and structured-output LLM client
 
-Start without `gallery-dl`. `yt-dlp` already provides the primary video/metadata path for the requested social sources. Add `gallery-dl` only when real Instagram carousel/image-caption fixtures demonstrate a gap that it solves. This keeps one volatile extractor instead of two.
+`yt-dlp` remains the primary video and post-metadata path. A real mixed Instagram carousel fixture showed that it can return a valid post caption while reporting “No video formats found” for a still-image child. Metadata extraction therefore tolerates unavailable child items and parses the post-level caption first. Only when that caption is insufficient does the worker use `gallery-dl` to fetch a bounded set of carousel images for vision review. If Instagram redirects the extractor to login, the job fails with `login_required`; the UI explains that the source is not public or requires login and lets the importer clear the failed draft.
 
-For social video, first request metadata and available subtitles without downloading the full video. If usable subtitles do not exist, download the smallest suitable audio stream, normalize it to transcription-friendly mono audio with FFmpeg, transcribe it, and discard the media. Website imports do not use the media binaries: fetch bounded HTML, prefer Recipe JSON-LD/schema.org, and fall back to readable page text plus structured LLM extraction.
+For social video, parse the title plus caption/description first. If that evidence already contains a useful ingredient list and actionable steps, return the draft without downloading subtitles or media. Otherwise fetch original-language subtitles without downloading the video and parse the accumulated evidence again. Download and transcribe the smallest suitable audio stream only when the subtitle-enriched draft is still incomplete. Download a 480p-or-smaller video and inspect a bounded set of sampled frames only when the transcript still leaves visual gaps such as on-screen quantities or unstated actions. Website imports do not use the media binaries: fetch bounded HTML, prefer Recipe JSON-LD/schema.org, and fall back to readable page text plus structured LLM extraction.
+
+Source access is direct by default. A configured DataImpulse residential proxy is used only after an access failure. Once activated, the worker reuses one job-specific `sessid` for metadata, subtitle, audio, and video requests for the remainder of that import. Convex and OpenRouter traffic never uses this proxy.
 
 ### Deployment
 
@@ -47,7 +50,7 @@ Cloudflare Containers is the preferred consolidation option if keeping all non-C
 
 ### Operational and security rules
 
-- Accept public `http`/`https` sources only; do not accept browser cookie uploads in V1.
+- Accept public `http`/`https` sources only; do not accept browser cookie uploads in V1. Sources requiring an authenticated platform session fail clearly rather than borrowing a user's browser session.
 - Block loopback, link-local, private, and metadata-service destinations before fetches and after redirects.
 - Invoke binaries with an argument array and `shell: false`; never interpolate a user URL into a shell command.
 - Use one isolated temporary directory per job and remove it in a `finally` path.
@@ -64,4 +67,4 @@ Cloudflare Containers is the preferred consolidation option if keeping all non-C
 - Local and production processing use the same Docker image.
 - Job progress and retries remain durable and visible in realtime.
 - Social-source reliability is best effort: public posts can still be blocked, rate-limited, or require platform tokens/cookies. The UI must retain the planned partial/failure states.
-- `yt-dlp` and its JavaScript runtime need active maintenance; this is an operational dependency, not a one-time installation.
+- `yt-dlp`, `gallery-dl`, and the JavaScript runtime need active maintenance; these are operational dependencies, not one-time installations.

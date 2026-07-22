@@ -4,6 +4,7 @@ import { ArrowRight, CookingPot } from '@phosphor-icons/react'
 import { useTranslation } from 'react-i18next'
 import { TopBar } from '@/components/AppShell'
 import { useCreateRecipeImport, useRecipeImports, useRecipes } from '@/data/hooks'
+import type { Doc } from '@convex/_generated/dataModel'
 
 export default function RecipesIndex() {
   const { t } = useTranslation()
@@ -97,20 +98,54 @@ export default function RecipesIndex() {
               <p className="mx-auto mt-3 max-w-64 text-sm leading-relaxed text-text-secondary">{t('recipe.empty')}</p>
             </div>
           ) : (
-            <div className="mt-2">
+            <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
               {recipes.map((recipe) => (
-                <Link key={recipe._id} to={`/recipes/${recipe._id}`} className="flex min-h-16 items-center justify-between gap-3 border-b border-border-subtle py-2">
-                  <span className="min-w-0">
-                    <span className="block truncate text-[17px] font-medium text-ink">{recipe.title}</span>
-                    <span className="mono-sm text-text-tertiary">{recipe.sourceDomain} · {t('recipe.ingredientCount', { count: recipe.ingredientCount })}</span>
-                  </span>
-                  <ArrowRight size={18} className="shrink-0 text-text-tertiary" aria-hidden="true" />
-                </Link>
+                <RecipeCard key={recipe._id} recipe={recipe} />
               ))}
-            </div>
+            </ul>
           )}
         </section>
       </div>
     </>
+  )
+}
+
+function RecipeCard({ recipe }: { recipe: Doc<'recipes'> }) {
+  const [imageFailed, setImageFailed] = useState(false)
+  const initial = recipe.title.trim().charAt(0).toLocaleUpperCase() || '·'
+  const imageUrl = imageFailed ? null : recipe.sourceImageUrl
+
+  return (
+    <li className="min-w-0">
+      <Link
+        to={`/recipes/${recipe._id}`}
+        className="group relative block aspect-[4/3] h-full overflow-hidden rounded-sm bg-background-alt shadow-[0_1px_0_rgba(10,41,80,0.08)] ring-1 ring-border-subtle transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(10,41,80,0.08)] active:translate-y-0 motion-reduce:transform-none"
+      >
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={recipe.title}
+            loading="lazy"
+            decoding="async"
+            referrerPolicy="no-referrer"
+            onError={() => setImageFailed(true)}
+            className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02] motion-reduce:transform-none"
+            sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+          />
+        ) : (
+          <div className="relative flex h-full items-center justify-center overflow-hidden bg-[linear-gradient(145deg,var(--color-surface)_0%,var(--color-background-alt)_100%)]">
+            <span aria-hidden="true" className="select-none text-[64px] font-semibold tracking-[-0.05em] text-ink/[0.08]">
+              {initial}
+            </span>
+            <CookingPot size={18} aria-hidden="true" className="absolute right-3 top-3 text-text-disabled" />
+          </div>
+        )}
+        <div className="absolute inset-x-2 bottom-2 min-w-0 rounded-xs border border-white/60 bg-surface-floating/90 px-3 py-2 text-ink shadow-[0_2px_10px_rgba(10,41,80,0.08)] backdrop-blur-md">
+          <div className="line-clamp-2 text-[15px] font-semibold leading-snug tracking-[-0.01em]">
+            {recipe.title}
+          </div>
+        </div>
+      </Link>
+    </li>
   )
 }

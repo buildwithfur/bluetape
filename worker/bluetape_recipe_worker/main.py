@@ -37,7 +37,12 @@ def run() -> None:
                 client.complete(job, result.model_dump(exclude_none=True))
                 logger.info("job_ready_for_review job_id=%s", job.job_id)
             except ExtractionError as exc:
-                logger.warning("job_failed job_id=%s code=%s", job.job_id, exc.code)
+                logger.warning(
+                    "job_failed job_id=%s code=%s detail=%s",
+                    job.job_id,
+                    exc.code,
+                    str(exc),
+                )
                 client.fail(job, exc.code, str(exc))
             except Exception as exc:
                 logger.exception("job_failed job_id=%s", job.job_id)

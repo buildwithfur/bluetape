@@ -17,6 +17,7 @@ class Settings:
     worker_secret: str
     openrouter_api_key: str | None
     openrouter_model: str
+    openrouter_vision_model: str
     transcription_provider: str
     transcription_api_key: str | None
     transcription_api_url: str
@@ -26,6 +27,8 @@ class Settings:
     poll_seconds: float
     max_video_seconds: int
     max_download_bytes: int
+    max_visual_frames: int
+    dataimpulse_proxy_url: str | None
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -35,6 +38,9 @@ class Settings:
             openrouter_api_key=os.environ.get("OPENROUTER_API_KEY", "").strip() or None,
             openrouter_model=os.environ.get(
                 "OPENROUTER_RECIPE_MODEL", "deepseek/deepseek-v4-flash"
+            ).strip(),
+            openrouter_vision_model=os.environ.get(
+                "OPENROUTER_VISION_MODEL", "google/gemini-2.5-flash"
             ).strip(),
             transcription_provider=os.environ.get("TRANSCRIPTION_PROVIDER", "local").strip(),
             transcription_api_key=os.environ.get("TRANSCRIPTION_API_KEY", "").strip() or None,
@@ -49,4 +55,8 @@ class Settings:
             poll_seconds=float(os.environ.get("WORKER_POLL_SECONDS", "5")),
             max_video_seconds=int(os.environ.get("MAX_VIDEO_SECONDS", "1800")),
             max_download_bytes=int(os.environ.get("MAX_DOWNLOAD_BYTES", str(150 * 1024 * 1024))),
+            max_visual_frames=int(os.environ.get("MAX_VISUAL_FRAMES", "12")),
+            dataimpulse_proxy_url=(
+                os.environ.get("DATAIMPULSE_PROXY_URL", "").strip() or None
+            ),
         )

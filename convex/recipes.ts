@@ -8,7 +8,7 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import { canonicalizeWikiReferences } from "./wiki";
-import { isOwner, requireFamilyMember } from "./permissions";
+import { isOwner, requireFamilyMember, requireProfile } from "./permissions";
 
 const sourceTypeValidator = v.union(
   v.literal("tiktok"),
@@ -26,6 +26,7 @@ const workerStageValidator = v.union(
 
 const MAX_ITEMS = 100;
 const LEASE_MS = 5 * 60 * 1000;
+const CURRENT_PIPELINE_VERSION = 3;
 const TRACKING_PARAMS = new Set([
   "fbclid", "gclid", "igsh", "igshid", "si", "feature",
   "utm_campaign", "utm_content", "utm_medium", "utm_source", "utm_term",
@@ -208,6 +209,7 @@ export const createImport = mutation({
   args: { familyId: v.id("families"), url: v.string() },
   handler: async (ctx, args) => {
     const { userId } = await requireFamilyMember(ctx, args.familyId);
+    const profile = await requireProfile(ctx, userId);
     const source = normalizeRecipeSource(args.url);
     const existing = await ctx.db.query("recipes")
       .withIndex("by_family_and_normalized_source_url", (q) =>
@@ -215,6 +217,24 @@ export const createImport = mutation({
       .unique();
     if (existing) {
       const job = await findJobForRecipe(ctx, existing);
+      if (
+        existing.status === "draft" &&
+        job &&
+        (job.targetLocale !== profile.locale || job.pipelineVersion !== CURRENT_PIPELINE_VERSION) &&
+        (job.status === "queued" || job.status === "needs_review" || job.status === "failed")
+      ) {
+        await ctx.db.patch(job._id, {
+          targetLocale: profile.locale,
+          pipelineVersion: CURRENT_PIPELINE_VERSION,
+          status: "queued",
+          stage: "queued",
+          leaseToken: undefined,
+          leaseExpiresAt: undefined,
+          lastErrorCode: undefined,
+          lastErrorMessage: undefined,
+          updatedAt: Date.now(),
+        });
+      }
       return {
         kind: existing.status === "published" ? "recipe" as const : "import" as const,
         recipeId: existing._id,
@@ -240,6 +260,8 @@ export const createImport = mutation({
       familyId: args.familyId,
       recipeId,
       ...source,
+      targetLocale: profile.locale,
+      pipelineVersion: CURRENT_PIPELINE_VERSION,
       createdBy: userId,
       status: "queued",
       stage: "queued",
@@ -260,7 +282,10 @@ export const retryImport = mutation({
     if (!recipe) throw new Error("Recipe draft not found");
     const access = await requireFamilyMember(ctx, job.familyId);
     if (!canManage(recipe, access)) throw new Error("You cannot retry this import");
+    const profile = await requireProfile(ctx, access.userId);
     await ctx.db.patch(args.jobId, {
+      targetLocale: profile.locale,
+      pipelineVersion: CURRENT_PIPELINE_VERSION,
       status: "queued",
       stage: "queued",
       leaseToken: undefined,
@@ -269,6 +294,37 @@ export const retryImport = mutation({
       lastErrorMessage: undefined,
       updatedAt: Date.now(),
     });
+    return null;
+  },
+});
+
+export const discardImport = mutation({
+  args: { jobId: v.id("recipeImportJobs") },
+  handler: async (ctx, args) => {
+    const job = await ctx.db.get(args.jobId);
+    if (!job) return null;
+    const recipe = await ctx.db.get(job.recipeId);
+    if (!recipe) {
+      await ctx.db.delete(job._id);
+      return null;
+    }
+    const access = await requireFamilyMember(ctx, job.familyId);
+    if (!canManage(recipe, access)) throw new Error("You cannot clear this recipe import");
+    if (recipe.status !== "draft" || job.status === "published") {
+      throw new Error("Only unpublished recipe imports can be cleared");
+    }
+    const children = await childrenFor(ctx, recipe._id);
+    await deleteTranslationsFor(ctx, recipe.familyId, "recipe", recipe._id);
+    for (const ingredient of children.ingredients) {
+      await deleteTranslationsFor(ctx, recipe.familyId, "recipeIngredient", ingredient._id);
+      await ctx.db.delete(ingredient._id);
+    }
+    for (const step of children.steps) {
+      await deleteTranslationsFor(ctx, recipe.familyId, "recipeStep", step._id);
+      await ctx.db.delete(step._id);
+    }
+    await ctx.db.delete(job._id);
+    await ctx.db.delete(recipe._id);
     return null;
   },
 });
@@ -418,6 +474,7 @@ export const claimNext = internalMutation({
       recipeId: job.recipeId,
       sourceUrl: job.sourceUrl,
       sourceType: job.sourceType,
+      targetLocale: job.targetLocale ?? "en",
       leaseToken,
     };
   },
@@ -450,6 +507,7 @@ export const completeWorkerDraft = internalMutation({
     steps: v.array(v.string()),
     sourceName: v.optional(v.string()),
     sourceImageUrl: v.optional(v.string()),
+    sourceLanguage: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const job = await ctx.db.get(args.jobId);
@@ -465,6 +523,7 @@ export const completeWorkerDraft = internalMutation({
       title,
       sourceName: args.sourceName?.trim() || undefined,
       sourceImageUrl: args.sourceImageUrl?.trim() || undefined,
+      sourceLanguage: args.sourceLanguage?.trim() || undefined,
       searchText: `${title}\n${ingredients.join("\n")}`.toLowerCase(),
       ingredientCount: ingredients.length,
       stepCount: steps.length,

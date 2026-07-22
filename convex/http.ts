@@ -111,6 +111,7 @@ recipeWorkerRoute("/recipe-worker/complete", async (ctx, body) =>
     steps: body.steps,
     sourceName: body.sourceName,
     sourceImageUrl: body.sourceImageUrl,
+    sourceLanguage: body.sourceLanguage,
   }));
 
 recipeWorkerRoute("/recipe-worker/fail", async (ctx, body) =>

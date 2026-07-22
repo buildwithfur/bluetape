@@ -13,12 +13,14 @@ export function RecipeEditor({
   initial,
   sourceUrl,
   sourceLabel,
+  sourceNote,
   saving,
   onSave,
 }: {
   initial: RecipeDraft
   sourceUrl: string
   sourceLabel: string
+  sourceNote?: string
   saving: boolean
   onSave: (draft: RecipeDraft) => Promise<void>
 }) {
@@ -158,6 +160,7 @@ export function RecipeEditor({
             {t('recipe.openSource')}
           </a>
         </div>
+        {sourceNote && <p className="mt-1 text-sm text-text-secondary">{sourceNote}</p>}
       </section>
 
       {error && <p role="alert" className="mt-4 text-sm text-error-text">{error}</p>}
