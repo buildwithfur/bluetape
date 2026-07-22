@@ -9,7 +9,6 @@ description = "External media and website recipe extraction worker for Bluetape"
 requires-python = ">=3.12"
 dependencies = [
   "beautifulsoup4>=4.13,<5",
-  "faster-whisper>=1.2,<2",
   "gallery-dl<2",
   "httpx>=0.28,<1",
   "pydantic>=2.11,<3",

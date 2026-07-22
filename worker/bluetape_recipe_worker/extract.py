@@ -5,7 +5,6 @@ import json
 import re
 import subprocess
 from dataclasses import dataclass
-from functools import lru_cache
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urljoin, urlparse
@@ -609,28 +608,10 @@ def _transcribe_api(settings: Settings, audio: Path) -> str:
     return text[:60_000]
 
 
-@lru_cache(maxsize=2)
-def _local_whisper_model(model_name: str):
-    from faster_whisper import WhisperModel
-
-    return WhisperModel(model_name, device="cpu", compute_type="int8")
-
-
-def _transcribe_local(settings: Settings, audio: Path) -> str:
-    model = _local_whisper_model(settings.local_whisper_model)
-    segments, _info = model.transcribe(str(audio), vad_filter=True, beam_size=3)
-    text = " ".join(segment.text.strip() for segment in segments if segment.text.strip())
-    if not text:
-        raise ExtractionError("transcript_unavailable", "No speech was found in the video")
-    return text[:60_000]
-
-
 def _transcribe(settings: Settings, audio: Path) -> str:
     if settings.transcription_provider == "api":
         return _transcribe_api(settings, audio)
-    if settings.transcription_provider == "local":
-        return _transcribe_local(settings, audio)
-    raise ExtractionError("transcription_not_configured", "Unknown transcription provider")
+    raise ExtractionError("transcription_not_configured", "Only the API transcription provider is supported")
 
 
 def _download_audio(
