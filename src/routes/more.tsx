@@ -1,20 +1,30 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from 'react-router-dom'
-import { CaretRight, SignOut } from '@phosphor-icons/react'
+import { CaretRight, Check, Copy, SignOut } from '@phosphor-icons/react'
 import { TopBar } from '@/components/AppShell'
 import { useAuthActions } from '@convex-dev/auth/react'
+import { useCurrentProfile } from '@/data/hooks'
 import { appVersion } from '@/lib/app-version'
 
 export default function More() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { signOut } = useAuthActions()
+  const profile = useCurrentProfile()
+  const [copiedId, setCopiedId] = useState(false)
   const entries = [
     { to: '/more/rules', label: t('more.rules'), hint: t('more.rulesHint') },
     { to: '/routines', label: t('nav.routines'), hint: t('more.routinesHint') },
     { to: '/family', label: t('more.family'), hint: t('more.familyHint') },
     { to: '/language', label: t('settings.language'), hint: t('settings.hint') },
   ]
+
+  function copyId(value: string) {
+    void navigator.clipboard?.writeText(value)
+    setCopiedId(true)
+    setTimeout(() => setCopiedId(false), 1500)
+  }
 
   return (
     <>
@@ -52,9 +62,52 @@ export default function More() {
           </button>
         </li>
       </ul>
+      {profile && (
+        <div className="page-px py-4 text-center mono-sm text-text-tertiary">
+          <IdFooterLine
+            label={t('more.userId')}
+            value={profile.userId}
+            copied={copiedId}
+            copyLabel={t('more.copyUserId')}
+            copiedLabel={t('action.copied')}
+            onCopy={() => copyId(profile.userId)}
+          />
+        </div>
+      )}
       <p className="page-px py-4 text-center mono-sm text-text-tertiary md:hidden">
         {t('more.version', { version: appVersion })}
       </p>
     </>
+  )
+}
+
+function IdFooterLine({
+  label,
+  value,
+  copied,
+  copyLabel,
+  copiedLabel,
+  onCopy,
+}: {
+  label: string
+  value: string
+  copied: boolean
+  copyLabel: string
+  copiedLabel: string
+  onCopy: () => void
+}) {
+  return (
+    <div className="flex items-center justify-center gap-1 leading-6">
+      <span>{label}:</span>
+      <span className="truncate" title={value}>{value}</span>
+      <button
+        type="button"
+        className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-xs text-text-tertiary transition hover:bg-surface-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 active:bg-surface-active"
+        aria-label={copied ? copiedLabel : copyLabel}
+        onClick={onCopy}
+      >
+        {copied ? <Check size={18} aria-hidden="true" /> : <Copy size={18} aria-hidden="true" />}
+      </button>
+    </div>
   )
 }

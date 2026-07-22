@@ -244,8 +244,6 @@ export const save = mutation({
     title: v.string(),
     type: v.union(v.literal("item"), v.literal("rule")),
     content: v.string(),
-    localName: v.optional(v.string()),
-    localContent: v.optional(v.string()),
     location: v.optional(v.string()),
     photoId: v.optional(v.id("_storage")),
     pinnedToToday: v.optional(v.boolean()),
@@ -296,16 +294,11 @@ export const save = mutation({
         args.familyId,
         args.content,
       );
-      const preResolvedLocalContent = args.localContent === undefined
-        ? undefined
-        : await canonicalizeWikiReferences(ctx, args.familyId, args.localContent);
       await ctx.db.patch(args.pageId, {
         title: args.title,
         slug,
         type: args.type,
         content: preResolvedContent,
-        localName: args.localName,
-        localContent: preResolvedLocalContent,
         location: args.location,
         photoId: args.photoId,
         pinnedToToday: args.pinnedToToday,
@@ -317,11 +310,8 @@ export const save = mutation({
         args.familyId,
         preResolvedContent,
       );
-      const localContent = preResolvedLocalContent === undefined
-        ? undefined
-        : await canonicalizeWikiReferences(ctx, args.familyId, preResolvedLocalContent);
-      if (content !== preResolvedContent || localContent !== preResolvedLocalContent) {
-        await ctx.db.patch(args.pageId, { content, localContent });
+      if (content !== preResolvedContent) {
+        await ctx.db.patch(args.pageId, { content });
       }
       await rebuildLinks(ctx, args.familyId, args.pageId, content);
       return ctx.db.get(args.pageId);
@@ -342,8 +332,6 @@ export const save = mutation({
       slug,
       type: args.type,
       content: args.content,
-      localName: args.localName,
-      localContent: args.localContent,
       location: args.location,
       photoId: args.photoId,
       pinnedToToday: args.pinnedToToday,
@@ -352,11 +340,8 @@ export const save = mutation({
       updatedAt: now,
     });
     const content = await canonicalizeWikiReferences(ctx, args.familyId, args.content);
-    const localContent = args.localContent === undefined
-      ? undefined
-      : await canonicalizeWikiReferences(ctx, args.familyId, args.localContent);
-    if (content !== args.content || localContent !== args.localContent) {
-      await ctx.db.patch(pageId, { content, localContent });
+    if (content !== args.content) {
+      await ctx.db.patch(pageId, { content });
     }
     await rebuildLinks(ctx, args.familyId, pageId, content);
     return ctx.db.get(pageId);
@@ -382,6 +367,21 @@ export const remove = mutation({
       .collect();
     for (const link of links) {
       await ctx.db.delete(link._id);
+    }
+    const translations = await ctx.db
+      .query("contentTranslations")
+      .withIndex("by_entity_field_locale", (q) =>
+        q
+          .eq("familyId", page.familyId)
+          .eq("entityType", "page")
+          .eq("entityId", page._id),
+      )
+      .take(21);
+    if (translations.length > 20) {
+      throw new Error("Too many cached translations for this page");
+    }
+    for (const translation of translations) {
+      await ctx.db.delete(translation._id);
     }
     await ctx.db.delete(args.pageId);
   },

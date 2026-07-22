@@ -77,8 +77,6 @@ Single source of truth: `convex/schema.ts`. All tables use Convex IDs.
   type: "item" | "rule",
   content: string,         // markdown body (English) with [[wiki links]]
   // type-specific metadata (only relevant fields populated)
-  localName?: string,     // items only — local-language name
-  localContent?: string,  // optional markdown body in the user's preferred language
   location?: string,       // items only (e.g. "Kitchen Cabinet 3")
   photoId?: Id<"_storage">, // items only — Convex file storage ref
   pinnedToToday?: boolean,  // rules only — surfaces as a callout on Today
@@ -89,7 +87,7 @@ Single source of truth: `convex/schema.ts`. All tables use Convex IDs.
 ```
 **Indexes:** `slug` (for lookup), `title` (for link resolution), `by_type` (`type, updatedAt`), `pinned_rules` (`type, pinnedToToday` where type="rule"). Slug uniqueness is enforced in mutations by checking the indexed lookup before insert/update.
 
-**i18n note:** `content` + `localContent` remain the manual page-translation pattern. Generated task and recipe translations live in the separate on-demand `contentTranslations` cache; authored fields remain authoritative and are never overwritten. Page-body translation is deferred until Markdown can be segmented and reconstructed safely.
+**i18n note:** Generated translations live in the separate on-demand `contentTranslations` cache; authored fields remain authoritative and are never overwritten. Page bodies are translated lazily while protected Markdown structure is preserved.
 
 ### `links` — outbound wiki links from a page (for backlinks)
 ```ts
@@ -376,14 +374,13 @@ Today's checklist                  ← label-caps, tertiary
 
 **B. User content — operator-gated lazy translation**
 - Authored entity fields remain the permanent source of truth.
-- `pages.localName` and `pages.localContent` remain manually authored page fields.
-- One-off task titles and notes use on-demand translation backed by separate `contentTranslations` cache rows. PER-3 registers recipe titles, ingredient rows, and step rows with the same lifecycle; source fields are never replaced.
+- Tasks, routines, shopping names, notes/rules, and recipes use one on-demand `contentTranslations` cache. Registered fields include task title/note; routine title/description; shopping name; page title/location/Markdown body; and recipe title/notes/ingredient rows/step rows. Source fields are never replaced.
 - Translation is enabled per profile only when `userProfiles.autoTranslateEnabled === true`. Missing/false is disabled, new profiles default false, and no public application mutation can change it.
 - The Language screen displays the flag as a disabled switch. An operator changes it directly in the Convex database.
-- A gated viewer sees source immediately; missing translations are generated for that viewer's selected locale only when supported content is viewed. Recipe review/edit always uses source, while translated recipe detail offers Show original.
+- A gated viewer sees source immediately; missing translations are generated for that viewer's selected locale only when the relevant UI content is viewed. Recipe and other editors always use source fields. A single app-level pending indicator is display-only and never creates work.
 - OpenRouter is the provider gateway. The default model is `deepseek/deepseek-v4-flash`; credentials remain server-side in `OPENROUTER_API_KEY`.
 - Wiki identities, URLs, code, numbers, recipe quantities, and dates are protected across translation. Editing source invalidates cached results through `sourceHash`; translation never blocks save.
-- Routines, shopping, Search, notes, rules, and page bodies remain source/manual-only until explicitly expanded and reviewed. Recipe search continues matching authored source fields.
+- Search labels use the same cache when search is open, while query matching continues against authored source fields.
 
 Operational instructions and exact flag behavior live in `docs/translation.md`. The detailed lifecycle and safety design live in `docs/plans/2026-07-16-lazy-normalized-content-translation.md`; the recipe extension lives in `docs/plans/2026-07-22-recipe-import-uiux-plan.md`.
 

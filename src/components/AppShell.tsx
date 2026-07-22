@@ -1,4 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ListChecks,
@@ -13,6 +14,7 @@ import {
   UsersThree,
   Globe,
   SignOut,
+  CircleNotch,
 } from '@phosphor-icons/react'
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/cn'
@@ -20,6 +22,7 @@ import { appVersion } from '@/lib/app-version'
 import { useOptionalSearchPalette } from './SearchContext'
 import { todayLabel } from '@/lib/date'
 import { useCurrentRole, useNavigationWarmup } from '@/data/hooks'
+import { useTranslationActivity } from '@/data/useLocalizedFields'
 import { useAuthActions } from '@convex-dev/auth/react'
 
 /** Per PLAN.md §6.9: 5-tab bottom bar on mobile (Tasks · Notes · Recipes · Shopping · More),
@@ -288,7 +291,35 @@ export function AppShell({
           {children}
         </main>
       </div>
+      {showChrome && <TranslationStatus />}
       {showChrome && <TabBar />}
     </div>
+  )
+}
+
+function TranslationStatus() {
+  const { t } = useTranslation()
+  const activity = useTranslationActivity()
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    if (!activity?.pending) {
+      setVisible(false)
+      return
+    }
+    const timer = window.setTimeout(() => setVisible(true), 300)
+    return () => window.clearTimeout(timer)
+  }, [activity?.pending])
+
+  if (!visible) return null
+  return (
+    <p
+      role="status"
+      aria-live="polite"
+      className="fixed z-40 bottom-[calc(3.5rem+env(safe-area-inset-bottom)+0.5rem)] right-4 inline-flex items-center gap-2 rounded-xs border border-border-subtle bg-surface px-3 py-2 text-sm text-text-secondary shadow-[0_2px_8px_rgba(10,41,80,0.04)] md:bottom-auto md:top-[5.5rem] md:right-8"
+    >
+      <CircleNotch size={16} className="animate-spin text-accent motion-reduce:animate-none" aria-hidden="true" />
+      {t('translation.inProgress')}
+    </p>
   )
 }

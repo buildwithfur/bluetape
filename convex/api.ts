@@ -263,8 +263,6 @@ export const savePage = internalMutation({
     title: v.string(),
     type: v.union(v.literal("item"), v.literal("rule")),
     content: v.string(),
-    localName: v.optional(v.string()),
-    localContent: v.optional(v.string()),
     location: v.optional(v.string()),
     photoId: v.optional(v.id("_storage")),
     pinnedToToday: v.optional(v.boolean()),
@@ -293,16 +291,11 @@ export const savePage = internalMutation({
         args.familyId,
         args.content,
       );
-      const preResolvedLocalContent = args.localContent === undefined
-        ? undefined
-        : await canonicalizeWikiReferences(ctx, args.familyId, args.localContent);
       await ctx.db.patch(args.pageId, {
         title: args.title,
         slug,
         type: args.type,
         content: preResolvedContent,
-        localName: args.localName,
-        localContent: preResolvedLocalContent,
         location: args.location,
         photoId: args.photoId,
         pinnedToToday: args.pinnedToToday,
@@ -314,11 +307,8 @@ export const savePage = internalMutation({
         args.familyId,
         preResolvedContent,
       );
-      const localContent = preResolvedLocalContent === undefined
-        ? undefined
-        : await canonicalizeWikiReferences(ctx, args.familyId, preResolvedLocalContent);
-      if (content !== preResolvedContent || localContent !== preResolvedLocalContent) {
-        await ctx.db.patch(args.pageId, { content, localContent });
+      if (content !== preResolvedContent) {
+        await ctx.db.patch(args.pageId, { content });
       }
       await rebuildLinks(ctx, args.familyId, args.pageId, content);
       return ctx.db.get(args.pageId);
@@ -338,8 +328,6 @@ export const savePage = internalMutation({
       slug,
       type: args.type,
       content: args.content,
-      localName: args.localName,
-      localContent: args.localContent,
       location: args.location,
       photoId: args.photoId,
       pinnedToToday: args.pinnedToToday,
@@ -348,11 +336,8 @@ export const savePage = internalMutation({
       updatedAt: now,
     });
     const content = await canonicalizeWikiReferences(ctx, args.familyId, args.content);
-    const localContent = args.localContent === undefined
-      ? undefined
-      : await canonicalizeWikiReferences(ctx, args.familyId, args.localContent);
-    if (content !== args.content || localContent !== args.localContent) {
-      await ctx.db.patch(pageId, { content, localContent });
+    if (content !== args.content) {
+      await ctx.db.patch(pageId, { content });
     }
     await rebuildLinks(ctx, args.familyId, pageId, content);
     return ctx.db.get(pageId);

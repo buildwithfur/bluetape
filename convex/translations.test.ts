@@ -112,6 +112,107 @@ describe('translation feature gate', () => {
     expect(rows[0]?.generation).toBe(1)
   })
 
+  it('retries a first-attempt provider truncation through smaller batches', async () => {
+    const { t, userId, familyId, taskId } = await setupProfile({ enabled: true })
+    const sourceHash = await sha256Hex('you dont anyhow throw things around')
+    await t.run(async (ctx) => {
+      await ctx.db.insert('contentTranslations', {
+        familyId,
+        entityType: 'task',
+        entityId: taskId,
+        field: 'title',
+        targetLocale: 'my',
+        sourceHash,
+        generation: 1,
+        status: 'failed',
+        errorCode: 'provider_incomplete_response',
+        retryAfter: Date.now() + 5 * 60 * 1000,
+        updatedAt: 1,
+      })
+    })
+
+    const user = asUser(t, userId)
+    await expect(user.query(api.translations.getForFields, {
+      fields: [{ entityType: 'task', entityId: taskId, field: 'title' }],
+    })).resolves.toMatchObject({
+      results: [{ state: 'missing' }],
+    })
+    await user.mutation(api.translations.ensureForFields, {
+      fields: [{ entityType: 'task', entityId: taskId, field: 'title' }],
+    })
+
+    const rows = await t.run((ctx) => ctx.db.query('contentTranslations').collect())
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ status: 'pending', generation: 2 })
+  })
+
+  it('claims visible routines, pages, shopping rows, and recipe text through the same cache', async () => {
+    const { t, userId, familyId } = await setupProfile({ enabled: true })
+    const ids = await t.run(async (ctx) => {
+      const routineId = await ctx.db.insert('routines', {
+        familyId,
+        title: 'Wipe the kitchen counter',
+        description: 'Use the blue cloth only.',
+        frequency: 'daily',
+        sortOrder: 0,
+        isActive: true,
+        createdBy: userId,
+      })
+      const pageId = await ctx.db.insert('pages', {
+        familyId,
+        title: 'Kitchen rules',
+        slug: 'kitchen-rules',
+        type: 'rule',
+        content: '# Kitchen\n\nDo not use the toilet cloth here.',
+        createdBy: userId,
+        updatedBy: userId,
+        updatedAt: 1,
+      })
+      const groceryItemId = await ctx.db.insert('groceryItems', {
+        familyId,
+        name: 'Dishwashing liquid',
+        status: 'pending',
+        addedBy: userId,
+        createdAt: 1,
+      })
+      const recipeId = await ctx.db.insert('recipes', {
+        familyId,
+        title: 'Egg fried rice',
+        notes: 'Serve while hot.',
+        status: 'published',
+        sourceUrl: 'https://example.com/recipe',
+        normalizedSourceUrl: 'https://example.com/recipe',
+        sourceType: 'website',
+        sourceDomain: 'example.com',
+        searchText: 'egg fried rice',
+        ingredientCount: 0,
+        stepCount: 0,
+        createdBy: userId,
+        updatedBy: userId,
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      return { routineId, pageId, groceryItemId, recipeId }
+    })
+
+    const user = asUser(t, userId)
+    await user.mutation(api.translations.ensureForFields, {
+      fields: [
+        { entityType: 'routine', entityId: ids.routineId, field: 'description' },
+        { entityType: 'page', entityId: ids.pageId, field: 'content' },
+        { entityType: 'groceryItem', entityId: ids.groceryItemId, field: 'name' },
+        { entityType: 'recipe', entityId: ids.recipeId, field: 'notes' },
+      ],
+    })
+
+    await expect(user.query(api.translations.getActivity, {})).resolves.toEqual({
+      enabled: true,
+      pending: true,
+    })
+    const rows = await t.run((ctx) => ctx.db.query('contentTranslations').collect())
+    expect(rows).toHaveLength(4)
+  })
+
   it('rejects task references from another family', async () => {
     const { t, userId } = await setupProfile({ enabled: true })
     const foreignTaskId = await t.run(async (ctx) => {

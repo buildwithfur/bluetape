@@ -422,8 +422,6 @@ async function handlePost(
         title: body.title,
         type: body.type,
         content: body.content || "",
-        localName: body.localName,
-        localContent: body.localContent,
         location: body.location,
         pinnedToToday: body.pinnedToToday,
       });

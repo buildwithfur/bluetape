@@ -1,25 +1,30 @@
 # Typed Content Translation
 
-Bluetape can translate user-authored task text into the signed-in viewer's
-selected language. This is an operator-controlled pilot for typed content; it
-is separate from any future voice-input feature.
+Bluetape can translate visible user-authored content into the signed-in
+viewer’s selected language. This is an operator-controlled text feature; it is
+separate from any future voice-input feature.
 
 ## Current scope
 
-The pilot translates:
+The lazy translation cache covers:
 
-- one-off task titles in the Today and Tomorrow sections
-- one-off task titles and notes on task detail
+- one-off task titles and notes, including Today, Tomorrow, Upcoming, detail,
+  and search-result labels
+- routine titles and descriptions
+- shopping item names
+- note and rule titles, locations, and Markdown bodies, including pinned-rule
+  callouts
+- recipe titles, ingredients, steps, and notes
 
-It does not translate routines, Upcoming rows, shopping items, notes, rules,
-Search results, or arbitrary Markdown page bodies. Editors always read and
-write the original authored task fields.
+It does not translate account/family names, email addresses, or numeric counts.
+Editors always read and write the original authored fields.
 
 When enabled, a view renders the original text immediately. It then reads a
 cached translation for the viewer's current locale or requests one missing
 translation in the background. Convex reactivity replaces the displayed text
-when the result becomes ready. There is no spinner and a provider failure
-leaves the original text visible.
+when the result becomes ready. A single app-level “Translating content…”
+indicator appears only while one or more viewer-locale jobs are pending; it
+does not create jobs itself. A provider failure leaves original text visible.
 
 ## Per-user feature flag
 
@@ -127,7 +132,7 @@ retry cooldown.
 
 ## Translation and cache behavior
 
-Authored tasks are never overwritten. A separate `contentTranslations` table
+Authored fields are never overwritten. A separate `contentTranslations` table
 stores disposable results keyed by family, entity, field, target locale, and a
 SHA-256 hash of the exact source.
 
@@ -139,15 +144,15 @@ The lifecycle is:
 4. One OpenRouter request interprets colloquial, dialectal, incomplete, or
    locally phrased input as clear standard English and translates that intended
    meaning.
-5. The result is stored only if the task, source hash, and claim generation are
+5. The result is stored only if the source entity, source hash, and claim generation are
    still current.
 6. The subscribed UI displays the ready translation.
 
-The provider call protects wiki targets, URLs, inline/fenced code, and numeric
-values with placeholders. A result with missing, duplicated, or altered
-placeholders is rejected. Editing source text makes the previous cached result
-stale; toggling task completion does not. Deleting a task also deletes its
-translation rows.
+The provider call protects Markdown structure, wiki targets, URLs,
+inline/fenced code, and numeric values with placeholders. A result with
+missing, duplicated, or altered placeholders is rejected. Editing source text
+makes the previous cached result stale; toggling task completion does not.
+Deleting a translated source entity also deletes its translation rows.
 
 ## Operational checks
 

@@ -17,6 +17,7 @@ import {
 import { SUPPORTED_LOCALES } from "./supportedLocales";
 import {
   MAX_TRANSLATION_FIELDS,
+  MAX_TRANSLATION_BATCH,
   TRANSLATION_LEASE_MS,
   TRANSLATION_RETRY_MS,
   translationClaimValidator,
@@ -37,17 +38,32 @@ const fieldStateValidator = v.union(
 const fieldResultValidator = v.object({
   entityType: v.union(
     v.literal("task"),
+    v.literal("routine"),
+    v.literal("page"),
+    v.literal("groceryItem"),
     v.literal("recipe"),
     v.literal("recipeIngredient"),
     v.literal("recipeStep"),
   ),
   entityId: v.union(
     v.id("tasks"),
+    v.id("routines"),
+    v.id("pages"),
+    v.id("groceryItems"),
     v.id("recipes"),
     v.id("recipeIngredients"),
     v.id("recipeSteps"),
   ),
-  field: v.union(v.literal("title"), v.literal("note"), v.literal("text")),
+  field: v.union(
+    v.literal("title"),
+    v.literal("note"),
+    v.literal("description"),
+    v.literal("content"),
+    v.literal("location"),
+    v.literal("name"),
+    v.literal("notes"),
+    v.literal("text"),
+  ),
   state: fieldStateValidator,
   translatedText: v.optional(v.string()),
   retryAfter: v.optional(v.number()),
@@ -107,11 +123,12 @@ function refFromTranslation(
       field: translation.field,
     };
   }
-  if (translation.entityType === "recipe" && translation.field === "title") {
+  if (translation.entityType === "recipe" &&
+      (translation.field === "title" || translation.field === "notes")) {
     return {
       entityType: "recipe",
       entityId: translation.entityId as Id<"recipes">,
-      field: "title",
+      field: translation.field,
     };
   }
   if (translation.entityType === "recipeIngredient" && translation.field === "text") {
@@ -126,6 +143,29 @@ function refFromTranslation(
       entityType: "recipeStep",
       entityId: translation.entityId as Id<"recipeSteps">,
       field: "text",
+    };
+  }
+  if (translation.entityType === "routine" &&
+      (translation.field === "title" || translation.field === "description")) {
+    return {
+      entityType: "routine",
+      entityId: translation.entityId as Id<"routines">,
+      field: translation.field,
+    };
+  }
+  if (translation.entityType === "page" &&
+      (translation.field === "title" || translation.field === "content" || translation.field === "location")) {
+    return {
+      entityType: "page",
+      entityId: translation.entityId as Id<"pages">,
+      field: translation.field,
+    };
+  }
+  if (translation.entityType === "groceryItem" && translation.field === "name") {
+    return {
+      entityType: "groceryItem",
+      entityId: translation.entityId as Id<"groceryItems">,
+      field: "name",
     };
   }
   return null;
@@ -152,7 +192,10 @@ async function sourceForRef(
       if (!recipe || recipe.familyId !== familyId) {
         throw new Error("Recipe not found in current family");
       }
-      return { source: recipe.title, mode: "label" };
+      return {
+        source: ref.field === "title" ? recipe.title : recipe.notes ?? "",
+        mode: ref.field === "title" ? "label" : "document",
+      };
     }
     case "recipeIngredient": {
       const ingredient = await ctx.db.get(ref.entityId);
@@ -167,6 +210,37 @@ async function sourceForRef(
         throw new Error("Recipe step not found in current family");
       }
       return { source: step.text, mode: "instruction" };
+    }
+    case "routine": {
+      const routine = await ctx.db.get(ref.entityId);
+      if (!routine || routine.familyId !== familyId) {
+        throw new Error("Routine not found in current family");
+      }
+      return {
+        source: ref.field === "title" ? routine.title : routine.description ?? "",
+        mode: ref.field === "title" ? "label" : "instruction",
+      };
+    }
+    case "page": {
+      const page = await ctx.db.get(ref.entityId);
+      if (!page || page.familyId !== familyId) {
+        throw new Error("Page not found in current family");
+      }
+      return {
+        source: ref.field === "title"
+          ? page.title
+          : ref.field === "location"
+            ? page.location ?? ""
+            : page.content,
+        mode: ref.field === "content" ? "document" : "label",
+      };
+    }
+    case "groceryItem": {
+      const item = await ctx.db.get(ref.entityId);
+      if (!item || item.familyId !== familyId) {
+        throw new Error("Grocery item not found in current family");
+      }
+      return { source: item.name, mode: "label" };
     }
   }
 }
@@ -215,6 +289,13 @@ export const getForFields = query({
       } else if (translation.status === "ready") {
         results.push({ ...ref, state: "ready" as const, translatedText: translation.translatedText });
       } else if (translation.status === "failed") {
+        // Older large batches could exhaust the provider's output budget. Let
+        // those first-attempt rows run once more through the smaller batches.
+        if (translation.generation === 1 &&
+            translation.errorCode === "provider_incomplete_response") {
+          results.push({ ...ref, state: "missing" as const });
+          continue;
+        }
         results.push({ ...ref, state: "failed" as const, retryAfter: translation.retryAfter });
       } else {
         results.push({ ...ref, state: translation.status });
@@ -243,8 +324,10 @@ export const ensureForFields = mutation({
       const existing = await findTranslation(ctx, profile.currentFamilyId, ref, profile.locale);
       if (existing?.sourceHash === sourceHash &&
           (existing.status === "ready" || existing.status === "source_is_target" ||
-           (existing.status === "pending" && existing.leaseExpiresAt > now) ||
-           (existing.status === "failed" && existing.retryAfter > now))) {
+          (existing.status === "pending" && existing.leaseExpiresAt > now) ||
+          (existing.status === "failed" && existing.retryAfter > now &&
+            !(existing.generation === 1 &&
+              existing.errorCode === "provider_incomplete_response")))) {
         continue;
       }
 
@@ -267,10 +350,37 @@ export const ensureForFields = mutation({
       claims.push({ translationId, sourceHash, generation });
     }
 
-    if (claims.length > 0) {
-      await ctx.scheduler.runAfter(0, internal.translationActions.processClaims, { claims });
+    for (let offset = 0; offset < claims.length; offset += MAX_TRANSLATION_BATCH) {
+      await ctx.scheduler.runAfter(0, internal.translationActions.processClaims, {
+        claims: claims.slice(offset, offset + MAX_TRANSLATION_BATCH),
+      });
     }
     return null;
+  },
+});
+
+/** App-level status for the signed-in viewer's family and selected language. */
+export const getActivity = query({
+  args: {},
+  returns: v.object({ enabled: v.boolean(), pending: v.boolean() }),
+  handler: async (ctx) => {
+    const { profile } = await requireAuthenticatedUser(ctx);
+    if (profile.autoTranslateEnabled !== true || !profile.currentFamilyId) {
+      return { enabled: false, pending: false };
+    }
+    const familyId = profile.currentFamilyId;
+    assertSupportedLocale(profile.locale);
+    await requireFamilyMember(ctx, familyId);
+    const rows = await ctx.db
+      .query("contentTranslations")
+      .withIndex("by_locale_status", (q) =>
+        q
+          .eq("familyId", familyId)
+          .eq("targetLocale", profile.locale)
+          .eq("status", "pending"),
+      )
+      .take(1);
+    return { enabled: true, pending: rows.length > 0 };
   },
 });
 
@@ -280,10 +390,10 @@ export const loadClaims = internalQuery({
     claim: translationClaimValidator,
     source: v.string(),
     targetLocale: v.string(),
-    mode: v.union(v.literal("label"), v.literal("instruction"), v.literal("ingredient")),
+    mode: v.union(v.literal("label"), v.literal("instruction"), v.literal("ingredient"), v.literal("document")),
   })),
   handler: async (ctx, args) => {
-    if (args.claims.length > MAX_TRANSLATION_FIELDS) throw new Error("Too many translation claims");
+    if (args.claims.length > MAX_TRANSLATION_BATCH) throw new Error("Too many translation claims");
     const loaded = [];
     for (const claim of args.claims) {
       const translation = await ctx.db.get(claim.translationId);
@@ -308,7 +418,7 @@ export const completeClaims = internalMutation({
   args: { completions: v.array(completionValidator) },
   returns: v.null(),
   handler: async (ctx, args) => {
-    if (args.completions.length > MAX_TRANSLATION_FIELDS) throw new Error("Too many translation completions");
+    if (args.completions.length > MAX_TRANSLATION_BATCH) throw new Error("Too many translation completions");
     const now = Date.now();
     for (const completion of args.completions) {
       const { claim } = completion;

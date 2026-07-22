@@ -197,6 +197,21 @@ export const remove = mutation({
     for (const c of completions) {
       await ctx.db.delete(c._id);
     }
+    const translations = await ctx.db
+      .query("contentTranslations")
+      .withIndex("by_entity_field_locale", (q) =>
+        q
+          .eq("familyId", existing.familyId)
+          .eq("entityType", "routine")
+          .eq("entityId", existing._id),
+      )
+      .take(21);
+    if (translations.length > 20) {
+      throw new Error("Too many cached translations for this routine");
+    }
+    for (const translation of translations) {
+      await ctx.db.delete(translation._id);
+    }
     await ctx.db.delete(args.routineId);
   },
 });

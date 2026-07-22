@@ -35,6 +35,16 @@ export function protectTranslatableText(source: string): ProtectedText {
   text = text.replace(/```[\s\S]*?```/g, (match) => protect(match));
   text = text.replace(/`[^`\n]+`/g, (match) => protect(match));
 
+  // Preserve the document skeleton for page and recipe-note Markdown. Text
+  // inside the structure remains translatable; only the syntax is protected.
+  text = text.replace(
+    /^(\s*(?:#{1,6}|[-+*]|\d+[.)]|>)\s+)/gm,
+    (match) => protect(match),
+  );
+  // Do not mistake our own __BT_*__ placeholders (created for code above)
+  // for Markdown emphasis markers.
+  text = text.replace(/\*\*|~~|(?<![A-Z])__(?![A-Z])/g, (match) => protect(match));
+
   // Keep wiki identity stable while allowing its visible label to translate.
   text = text.replace(
     /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g,

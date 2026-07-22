@@ -4,6 +4,7 @@ import { ArrowRight, CookingPot } from '@phosphor-icons/react'
 import { useTranslation } from 'react-i18next'
 import { TopBar } from '@/components/AppShell'
 import { useCreateRecipeImport, useRecipeImports, useRecipes } from '@/data/hooks'
+import { useLocalizedFields } from '@/data/useLocalizedFields'
 import type { Doc } from '@convex/_generated/dataModel'
 
 export default function RecipesIndex() {
@@ -15,6 +16,12 @@ export default function RecipesIndex() {
   const [url, setUrl] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const localized = useLocalizedFields((recipes ?? []).map((recipe) => ({
+    entityType: 'recipe' as const,
+    entityId: recipe._id,
+    field: 'title' as const,
+    source: recipe.title,
+  })))
 
   async function submit(event: React.FormEvent) {
     event.preventDefault()
@@ -100,7 +107,7 @@ export default function RecipesIndex() {
           ) : (
             <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
               {recipes.map((recipe) => (
-                <RecipeCard key={recipe._id} recipe={recipe} />
+                <RecipeCard key={recipe._id} recipe={recipe} title={localized.textFor({ entityType: 'recipe', entityId: recipe._id, field: 'title', source: recipe.title })} />
               ))}
             </ul>
           )}
@@ -110,9 +117,9 @@ export default function RecipesIndex() {
   )
 }
 
-function RecipeCard({ recipe }: { recipe: Doc<'recipes'> }) {
+function RecipeCard({ recipe, title }: { recipe: Doc<'recipes'>; title: string }) {
   const [imageFailed, setImageFailed] = useState(false)
-  const initial = recipe.title.trim().charAt(0).toLocaleUpperCase() || '·'
+  const initial = title.trim().charAt(0).toLocaleUpperCase() || '·'
   const imageUrl = imageFailed ? null : recipe.sourceImageUrl
 
   return (
@@ -124,7 +131,7 @@ function RecipeCard({ recipe }: { recipe: Doc<'recipes'> }) {
         {imageUrl ? (
           <img
             src={imageUrl}
-            alt={recipe.title}
+            alt={title}
             loading="lazy"
             decoding="async"
             referrerPolicy="no-referrer"
@@ -142,7 +149,7 @@ function RecipeCard({ recipe }: { recipe: Doc<'recipes'> }) {
         )}
         <div className="absolute inset-x-2 bottom-2 min-w-0 rounded-xs border border-white/60 bg-surface-floating/90 px-3 py-2 text-ink shadow-[0_2px_10px_rgba(10,41,80,0.08)] backdrop-blur-md">
           <div className="line-clamp-2 text-[15px] font-semibold leading-snug tracking-[-0.01em]">
-            {recipe.title}
+            {title}
           </div>
         </div>
       </Link>

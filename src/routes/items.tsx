@@ -6,11 +6,18 @@ import { EmptyState } from '@/components/EmptyState'
 import { usePages, useStorageUrl } from '@/data/hooks'
 import { pagePath } from '@/lib/record-route'
 import type { Doc } from '@convex/_generated/dataModel'
+import { useLocalizedFields } from '@/data/useLocalizedFields'
 
 /** Responsive catalog of note pages — both users can create (§6.6). */
 export default function Items() {
   const { t } = useTranslation()
   const items = usePages('item')
+  const localized = useLocalizedFields((items ?? []).map((item) => ({
+    entityType: 'page' as const,
+    entityId: item._id,
+    field: 'title' as const,
+    source: item.title,
+  })))
 
   return (
     <>
@@ -35,7 +42,7 @@ export default function Items() {
             </Link>
           </li>
           {items.map((p) => (
-            <NoteCard key={p._id} note={p} />
+            <NoteCard key={p._id} note={p} title={localized.textFor({ entityType: 'page', entityId: p._id, field: 'title', source: p.title })} />
           ))}
         </ul>
       )}
@@ -43,9 +50,9 @@ export default function Items() {
   )
 }
 
-function NoteCard({ note }: { note: Doc<'pages'> }) {
+function NoteCard({ note, title }: { note: Doc<'pages'>; title: string }) {
   const photoUrl = useStorageUrl(note.photoId)
-  const initial = note.title.trim().charAt(0).toLocaleUpperCase() || '·'
+  const initial = title.trim().charAt(0).toLocaleUpperCase() || '·'
 
   return (
     <li className="min-w-0">
@@ -56,7 +63,7 @@ function NoteCard({ note }: { note: Doc<'pages'> }) {
         {photoUrl ? (
           <img
             src={photoUrl}
-            alt={note.title}
+            alt={title}
             loading="lazy"
             decoding="async"
             className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02] motion-reduce:transform-none"
@@ -72,13 +79,8 @@ function NoteCard({ note }: { note: Doc<'pages'> }) {
         )}
         <div className="absolute inset-x-2 bottom-2 min-w-0 rounded-xs border border-white/60 bg-surface-floating/90 px-3 py-2 text-ink shadow-[0_2px_10px_rgba(10,41,80,0.08)] backdrop-blur-md">
           <div className="line-clamp-2 text-[15px] font-semibold leading-snug tracking-[-0.01em]">
-            {note.title}
+            {title}
           </div>
-          {note.localName && (
-            <div className="mt-0.5 truncate font-local-script text-[15px] text-ink/70" style={{ fontFamily: 'var(--font-local-script)' }}>
-              {note.localName}
-            </div>
-          )}
         </div>
       </Link>
     </li>

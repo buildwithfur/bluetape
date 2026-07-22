@@ -6,14 +6,20 @@ import { useCurrentProfile } from '@/data/hooks'
 
 export type LocalizedField =
   | { entityType: 'task'; entityId: Id<'tasks'>; field: 'title' | 'note'; source: string }
-  | { entityType: 'recipe'; entityId: Id<'recipes'>; field: 'title'; source: string }
+  | { entityType: 'routine'; entityId: Id<'routines'>; field: 'title' | 'description'; source: string }
+  | { entityType: 'page'; entityId: Id<'pages'>; field: 'title' | 'content' | 'location'; source: string }
+  | { entityType: 'groceryItem'; entityId: Id<'groceryItems'>; field: 'name'; source: string }
+  | { entityType: 'recipe'; entityId: Id<'recipes'>; field: 'title' | 'notes'; source: string }
   | { entityType: 'recipeIngredient'; entityId: Id<'recipeIngredients'>; field: 'text'; source: string }
   | { entityType: 'recipeStep'; entityId: Id<'recipeSteps'>; field: 'text'; source: string }
 
 export type LocalizedTaskField = Extract<LocalizedField, { entityType: 'task' }>
 type TranslationRef =
   | { entityType: 'task'; entityId: Id<'tasks'>; field: 'title' | 'note' }
-  | { entityType: 'recipe'; entityId: Id<'recipes'>; field: 'title' }
+  | { entityType: 'routine'; entityId: Id<'routines'>; field: 'title' | 'description' }
+  | { entityType: 'page'; entityId: Id<'pages'>; field: 'title' | 'content' | 'location' }
+  | { entityType: 'groceryItem'; entityId: Id<'groceryItems'>; field: 'name' }
+  | { entityType: 'recipe'; entityId: Id<'recipes'>; field: 'title' | 'notes' }
   | { entityType: 'recipeIngredient'; entityId: Id<'recipeIngredients'>; field: 'text' }
   | { entityType: 'recipeStep'; entityId: Id<'recipeSteps'>; field: 'text' }
 
@@ -38,14 +44,29 @@ export function useLocalizedFields(fields: LocalizedField[]) {
     enabled && refs.length > 0 ? { fields: refs } : 'skip',
   )
   const ensure = useMutation(api.translations.ensureForFields)
-  const needsTranslation = response?.results.some(
-    (result) => result.state === 'missing' || result.state === 'failed',
+  const hasMissingTranslation = response?.results.some(
+    (result) => result.state === 'missing',
+  )
+  const nextRetryAfter = response?.results.reduce<number | undefined>(
+    (earliest, result) => {
+      if (result.state !== 'failed' || !result.retryAfter) return earliest
+      return earliest === undefined ? result.retryAfter : Math.min(earliest, result.retryAfter)
+    },
+    undefined,
   )
 
   useEffect(() => {
-    if (!enabled || refs.length === 0 || !needsTranslation) return
-    void ensure({ fields: refs }).catch(() => undefined)
-  }, [enabled, ensure, needsTranslation, refs])
+    if (!enabled || refs.length === 0) return
+    if (hasMissingTranslation) {
+      void ensure({ fields: refs }).catch(() => undefined)
+      return
+    }
+    if (!nextRetryAfter) return
+    const timeout = window.setTimeout(() => {
+      void ensure({ fields: refs }).catch(() => undefined)
+    }, Math.max(0, nextRetryAfter - Date.now()) + 50)
+    return () => window.clearTimeout(timeout)
+  }, [enabled, ensure, hasMissingTranslation, nextRetryAfter, refs])
 
   const results = new Map(
     response?.results.map((result) => [fieldKey(result), result]),
@@ -53,8 +74,11 @@ export function useLocalizedFields(fields: LocalizedField[]) {
 
   return {
     enabled,
+    /** The cache is still loading, so do not briefly paint authored text over a cached translation. */
+    isLoading: enabled && refs.length > 0 && response === undefined,
     textFor(field: LocalizedField) {
       const result = results.get(fieldKey(field))
+      if (enabled && refs.length > 0 && response === undefined) return ''
       return result?.state === 'ready' && result.translatedText
         ? result.translatedText
         : field.source
@@ -63,6 +87,13 @@ export function useLocalizedFields(fields: LocalizedField[]) {
       return results.get(fieldKey(field))?.state === 'ready'
     },
   }
+}
+
+/** Observes existing work only; visible content is what creates jobs. */
+export function useTranslationActivity() {
+  const profile = useCurrentProfile()
+  const enabled = profile?.autoTranslateEnabled === true
+  return useQuery(api.translations.getActivity, enabled ? {} : 'skip')
 }
 
 /** Compatibility wrapper for the task screens shipped before recipes. */

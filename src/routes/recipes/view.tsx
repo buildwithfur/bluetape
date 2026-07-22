@@ -7,6 +7,7 @@ import { Markdown } from '@/components/Markdown'
 import { OverflowMenu } from '@/components/OverflowMenu'
 import { ShareButton } from '@/components/ShareButton'
 import { useDeleteRecipe, useRecipe } from '@/data/hooks'
+import { useLocalizedFields } from '@/data/useLocalizedFields'
 
 export default function RecipeView() {
   const { id } = useParams()
@@ -15,11 +16,24 @@ export default function RecipeView() {
   const data = useRecipe(id)
   const remove = useDeleteRecipe()
   const [deleting, setDeleting] = useState(false)
+  const localized = useLocalizedFields(
+    data && data !== undefined
+      ? [
+          { entityType: 'recipe' as const, entityId: data.recipe._id, field: 'title' as const, source: data.recipe.title },
+          ...(data.recipe.notes ? [{ entityType: 'recipe' as const, entityId: data.recipe._id, field: 'notes' as const, source: data.recipe.notes }] : []),
+          ...data.sections.flatMap((section) => [
+            ...section.ingredients.map((row) => ({ entityType: 'recipeIngredient' as const, entityId: row._id, field: 'text' as const, source: row.text })),
+            ...section.steps.map((row) => ({ entityType: 'recipeStep' as const, entityId: row._id, field: 'text' as const, source: row.text })),
+          ]),
+        ]
+      : [],
+  )
 
   if (data === undefined) return <><TopBar title={t('recipe.detail')} back /><p className="page-px py-10 text-sm text-text-tertiary">{t('common.loading')}</p></>
   if (data === null) return <><TopBar title={t('recipe.detail')} back /><p className="page-px py-10 text-sm text-error-text">{t('recipe.notFound')}</p></>
 
   const { recipe, canManage } = data
+  const title = localized.textFor({ entityType: 'recipe', entityId: recipe._id, field: 'title', source: recipe.title })
   return (
     <>
       <TopBar
@@ -58,7 +72,7 @@ export default function RecipeView() {
       />
       <article className="page-px pb-12 pt-6">
         <header>
-          <h1 className="max-w-[22ch] text-[32px] font-semibold leading-[1.08] tracking-[-0.025em] text-ink">{recipe.title}</h1>
+          <h1 className="max-w-[22ch] text-[32px] font-semibold leading-[1.08] tracking-[-0.025em] text-ink">{title}</h1>
           <p className="mt-3 mono-sm text-text-tertiary">{t('recipe.meta', { ingredients: recipe.ingredientCount, steps: recipe.stepCount })}</p>
           <div className="mt-4 flex min-h-11 items-center justify-between gap-3 border-y border-border-subtle py-2">
             <span className="min-w-0 truncate text-sm text-text-secondary">{t(`recipe.sourceType.${recipe.sourceType}`)}{recipe.sourceName ? ` · ${recipe.sourceName}` : ` · ${recipe.sourceDomain}`}</span>
@@ -74,15 +88,15 @@ export default function RecipeView() {
             {section.name && <h2 className="text-[22px] font-semibold text-ink">{section.name}</h2>}
             <h3 className="label-caps mt-3 text-text-tertiary">{t('recipe.ingredients')}</h3>
             <ul className="mt-2">
-              {section.ingredients.map((row) => <li key={row._id} className="min-h-12 border-b border-border-subtle py-3 text-[16px] leading-relaxed"><Markdown content={row.text} inline /></li>)}
+              {section.ingredients.map((row) => <li key={row._id} className="min-h-12 border-b border-border-subtle py-3 text-[16px] leading-relaxed"><Markdown content={localized.textFor({ entityType: 'recipeIngredient', entityId: row._id, field: 'text', source: row.text })} inline /></li>)}
             </ul>
             <h3 className="label-caps mt-6 text-text-tertiary">{t('recipe.steps')}</h3>
             <ol className="mt-1">
-              {section.steps.map((row, index) => <li key={row._id} className="grid grid-cols-[2rem_minmax(0,1fr)] gap-3 border-b border-border-subtle py-5"><span className="mono-md pt-0.5 text-text-tertiary">{index + 1}</span><Markdown content={row.text} className="text-[17px] leading-[1.65]" /></li>)}
+            {section.steps.map((row, index) => <li key={row._id} className="grid grid-cols-[2rem_minmax(0,1fr)] gap-3 border-b border-border-subtle py-5"><span className="mono-md pt-0.5 text-text-tertiary">{index + 1}</span><Markdown content={localized.textFor({ entityType: 'recipeStep', entityId: row._id, field: 'text', source: row.text })} className="text-[17px] leading-[1.65]" /></li>)}
             </ol>
           </section>
         ))}
-        {recipe.notes && <section className="mt-9 border-t border-border-subtle pt-5"><h2 className="label-caps text-text-tertiary">{t('record.note')}</h2><Markdown content={recipe.notes} className="mt-2 text-[17px] leading-[1.65]" /></section>}
+        {recipe.notes && <section className="mt-9 border-t border-border-subtle pt-5"><h2 className="label-caps text-text-tertiary">{t('record.note')}</h2><Markdown content={localized.textFor({ entityType: 'recipe', entityId: recipe._id, field: 'notes', source: recipe.notes })} className="mt-2 text-[17px] leading-[1.65]" /></section>}
       </article>
     </>
   )

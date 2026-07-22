@@ -8,6 +8,7 @@ import { WEEKDAYS_MONDAY_FIRST, weekdayName } from '@/lib/date'
 import type { Frequency } from '@/types'
 import { Markdown } from '@/components/Markdown'
 import { recordPath } from '@/lib/record-route'
+import { useLocalizedFields } from '@/data/useLocalizedFields'
 
 const GROUPS: Frequency[] = ['daily', 'weekly', 'monthly']
 
@@ -17,6 +18,10 @@ export default function RoutinesIndex() {
   const role = useCurrentRole()
   const navigate = useNavigate()
   const canManage = role === 'admin' || role === 'owner'
+  const localized = useLocalizedFields((routines ?? []).flatMap((routine) => [
+    { entityType: 'routine' as const, entityId: routine._id, field: 'title' as const, source: routine.title },
+    ...(routine.description ? [{ entityType: 'routine' as const, entityId: routine._id, field: 'description' as const, source: routine.description }] : []),
+  ]))
 
   if (!routines || !role) {
     return (
@@ -59,7 +64,7 @@ export default function RoutinesIndex() {
                 (r.isActive ? 'text-text-primary' : 'text-text-tertiary line-through')
               }
             >
-              <Markdown content={r.title} inline />
+              <Markdown content={localized.textFor({ entityType: 'routine', entityId: r._id, field: 'title', source: r.title })} inline />
             </div>
             {showSchedule && r.frequency === 'monthly' && (
               <div className="mono-sm text-text-tertiary mt-0.5">

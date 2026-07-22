@@ -471,8 +471,6 @@ export function useSavePage() {
     title: string
     type: 'item' | 'rule'
     content: string
-    localName?: string
-    localContent?: string
     location?: string
     photoId?: Id<'_storage'>
     pinnedToToday?: boolean
@@ -546,7 +544,7 @@ export function useSearch(query: string, enabled = true) {
   if (!q || !pages || !tasks || !recipes) return { items: [], rules: [], recipes: [], tasks: [] }
   const matches = (s?: string) => !!s && s.toLowerCase().includes(q)
   return {
-    items: pages.filter((p) => p.type === 'item' && (matches(p.title) || matches(p.content) || matches(p.location) || matches(p.localName))),
+    items: pages.filter((p) => p.type === 'item' && (matches(p.title) || matches(p.content) || matches(p.location))),
     rules: pages.filter((p) => p.type === 'rule' && (matches(p.title) || matches(p.content))),
     recipes: recipes.filter((recipe) => matches(recipe.searchText)),
     tasks: tasks.filter((t) => matches(t.title)),

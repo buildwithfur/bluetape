@@ -16,6 +16,7 @@ import {
 } from '@/data/hooks'
 import { recordPath } from '@/lib/record-route'
 import { groceryCount } from '@/lib/shopping'
+import { useLocalizedFields } from '@/data/useLocalizedFields'
 
 export default function Shopping() {
   const { t } = useTranslation()
@@ -28,6 +29,12 @@ export default function Shopping() {
   const [isAdding, setIsAdding] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [name, setName] = useState('')
+  const localized = useLocalizedFields((items ?? []).map((item) => ({
+    entityType: 'groceryItem' as const,
+    entityId: item._id,
+    field: 'name' as const,
+    source: item.name,
+  })))
 
   if (!items) {
     return (
@@ -96,7 +103,7 @@ export default function Shopping() {
               >
                 <Markdown
                   inline
-                  content={item.name}
+                  content={localized.textFor({ entityType: 'groceryItem', entityId: item._id, field: 'name', source: item.name })}
                   className={item.status === 'bought'
                     ? 'block truncate text-[16px] text-text-tertiary line-through'
                     : 'block truncate text-[16px] text-text-primary'}

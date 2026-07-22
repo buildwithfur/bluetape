@@ -22,6 +22,7 @@ import { formatInSG } from '@/lib/date'
 import { recordPath } from '@/lib/record-route'
 import { groceryCount } from '@/lib/shopping'
 import { wikiPlainText } from '@/lib/wiki'
+import { useLocalizedFields } from '@/data/useLocalizedFields'
 
 export default function ShoppingItemView() {
   const { t } = useTranslation()
@@ -36,6 +37,9 @@ export default function ShoppingItemView() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState(false)
+  const localized = useLocalizedFields(
+    item ? [{ entityType: 'groceryItem' as const, entityId: item._id, field: 'name' as const, source: item.name }] : [],
+  )
 
   if (item === undefined) {
     return (
@@ -106,7 +110,7 @@ export default function ShoppingItemView() {
             <CheckCircle checked={item.status === 'bought'} size={26} />
           </button>
           <h1 className="min-w-0 flex-1 px-2 py-1 text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink">
-            <Markdown inline content={item.name} />
+            <Markdown inline content={localized.textFor({ entityType: 'groceryItem', entityId: item._id, field: 'name', source: item.name })} />
           </h1>
         </div>
         <div className="mt-2 text-[16px] text-text-secondary">

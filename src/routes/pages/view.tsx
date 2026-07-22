@@ -30,6 +30,7 @@ import { pagePath } from '@/lib/record-route'
 import { wikiAuthoringText } from '@/lib/wiki'
 import type { PageType } from '@/types'
 import type { Id } from '@convex/_generated/dataModel'
+import { useLocalizedFields } from '@/data/useLocalizedFields'
 
 export default function PageView({ recordType }: { recordType?: PageType }) {
   const { t } = useTranslation()
@@ -61,6 +62,15 @@ export default function PageView({ recordType }: { recordType?: PageType }) {
   const contentInputRef = useRef<HTMLTextAreaElement>(null)
   const displayedPhotoId = photoDirty ? photoDraft : page?.photoId ?? undefined
   const photoUrl = useStorageUrl(displayedPhotoId)
+  const localized = useLocalizedFields(
+    page
+      ? [
+          { entityType: 'page' as const, entityId: page._id, field: 'title' as const, source: page.title },
+          ...(page.content ? [{ entityType: 'page' as const, entityId: page._id, field: 'content' as const, source: page.content }] : []),
+          ...(page.location ? [{ entityType: 'page' as const, entityId: page._id, field: 'location' as const, source: page.location }] : []),
+        ]
+      : [],
+  )
 
   const authoringContent = page && allPages
     ? wikiAuthoringText(page.content, allPages)
@@ -118,8 +128,6 @@ export default function PageView({ recordType }: { recordType?: PageType }) {
       title: next.title ?? currentPage.title,
       type: currentPage.type,
       content: next.content ?? currentPage.content,
-      localName: currentPage.localName,
-      localContent: currentPage.localContent,
       location: currentPage.location,
       photoId: next.replacePhoto ? next.photoId : currentPage.photoId,
       pinnedToToday: currentPage.pinnedToToday,
@@ -250,7 +258,7 @@ export default function PageView({ recordType }: { recordType?: PageType }) {
             <div className="aspect-[4/3] overflow-hidden rounded-md border border-border-line">
               <img
                 src={photoUrl}
-                alt={page.title}
+                alt={localized.textFor({ entityType: 'page', entityId: page._id, field: 'title', source: page.title })}
                 className="w-full h-full object-cover"
               />
             </div>
@@ -259,7 +267,7 @@ export default function PageView({ recordType }: { recordType?: PageType }) {
 
         <header className="page-px pt-4 pb-2">
           {page.location && (
-            <div className="mono-sm text-text-tertiary">{page.location}</div>
+            <div className="mono-sm text-text-tertiary">{localized.textFor({ entityType: 'page', entityId: page._id, field: 'location', source: page.location })}</div>
           )}
           {editingTitle ? (
             <input
@@ -288,24 +296,13 @@ export default function PageView({ recordType }: { recordType?: PageType }) {
                 onClick={() => setEditingTitle(true)}
                 className="w-full rounded-xs px-2 py-1 text-left text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink transition hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 active:bg-surface-active"
               >
-                {page.title}
+                {localized.textFor({ entityType: 'page', entityId: page._id, field: 'title', source: page.title })}
               </button>
             </h1>
           ) : (
             <h1 className="px-2 py-1 text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink">
-              {page.title}
+            {localized.textFor({ entityType: 'page', entityId: page._id, field: 'title', source: page.title })}
             </h1>
-          )}
-          {page.localName && (
-            <div className="mt-2">
-              <span className="label-caps text-text-tertiary mr-2">{t('page.brokenLinkLabel')}</span>
-              <span
-                className="text-ink"
-                style={{ fontFamily: 'var(--font-local-script)', fontSize: 24 }}
-              >
-                {page.localName}
-              </span>
-            </div>
           )}
           <div className="mono-sm text-text-tertiary mt-2 hidden md:block">
             {t('page.updated', { date: formatInSG(page.updatedAt, { day: 'numeric', month: 'short' }) })}
@@ -349,13 +346,13 @@ export default function PageView({ recordType }: { recordType?: PageType }) {
               className="min-h-16 w-full cursor-text rounded-xs px-2 py-2 text-left transition hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 active:bg-surface-active"
             >
               {page.content ? (
-                <Markdown content={page.content} />
+                <Markdown content={localized.textFor({ entityType: 'page', entityId: page._id, field: 'content', source: page.content })} />
               ) : (
                 <span className="text-[17px] text-text-tertiary">{t('page.field.contentPlaceholder')}</span>
               )}
             </div>
           ) : page.content ? (
-            <Markdown content={page.content} />
+            <Markdown content={localized.textFor({ entityType: 'page', entityId: page._id, field: 'content', source: page.content })} />
           ) : null}
           {saveError && (
             <p role="alert" className="mt-3 text-sm text-error-accent">

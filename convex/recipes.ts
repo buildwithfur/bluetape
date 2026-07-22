@@ -163,7 +163,14 @@ async function childrenFor(ctx: QueryCtx | MutationCtx, recipeId: Id<"recipes">)
 
 async function replaceChildren(ctx: MutationCtx, recipe: Doc<"recipes">, sections: RecipeSectionInput[]) {
   const existing = await childrenFor(ctx, recipe._id);
-  for (const row of [...existing.ingredients, ...existing.steps]) await ctx.db.delete(row._id);
+  for (const row of existing.ingredients) {
+    await deleteTranslationsFor(ctx, recipe.familyId, "recipeIngredient", row._id);
+    await ctx.db.delete(row._id);
+  }
+  for (const row of existing.steps) {
+    await deleteTranslationsFor(ctx, recipe.familyId, "recipeStep", row._id);
+    await ctx.db.delete(row._id);
+  }
   let ingredientSortOrder = 0;
   let stepSortOrder = 0;
   for (const section of sections) {

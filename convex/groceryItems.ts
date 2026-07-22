@@ -166,6 +166,21 @@ export const remove = mutation({
     if (!canDelete) {
       throw new Error("Only the item creator or a family admin can delete this item");
     }
+    const translations = await ctx.db
+      .query("contentTranslations")
+      .withIndex("by_entity_field_locale", (q) =>
+        q
+          .eq("familyId", item.familyId)
+          .eq("entityType", "groceryItem")
+          .eq("entityId", item._id),
+      )
+      .take(21);
+    if (translations.length > 20) {
+      throw new Error("Too many cached translations for this shopping item");
+    }
+    for (const translation of translations) {
+      await ctx.db.delete(translation._id);
+    }
     await ctx.db.delete(args.itemId);
     return null;
   },

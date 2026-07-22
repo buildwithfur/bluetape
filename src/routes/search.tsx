@@ -9,6 +9,7 @@ import { formatInSG } from '@/lib/date'
 import { pagePath, recordPath } from '@/lib/record-route'
 import { wikiPlainText } from '@/lib/wiki'
 import type { Doc } from '@convex/_generated/dataModel'
+import { useLocalizedFields } from '@/data/useLocalizedFields'
 
 /** Modal command palette — searches notes, rules, recipes, and tasks (PLAN.md §6.7).
  * Routines are excluded. On mobile the query dock stays above the keyboard,
@@ -21,6 +22,15 @@ export function SearchPalette() {
   const results = useSearch(query, open)
   const mobileInputRef = useRef<HTMLInputElement>(null)
   const desktopInputRef = useRef<HTMLInputElement>(null)
+  const localized = useLocalizedFields([
+    ...results.items.flatMap((page) => [
+      { entityType: 'page' as const, entityId: page._id, field: 'title' as const, source: page.title },
+      ...(page.location ? [{ entityType: 'page' as const, entityId: page._id, field: 'location' as const, source: page.location }] : []),
+    ]),
+    ...results.rules.map((page) => ({ entityType: 'page' as const, entityId: page._id, field: 'title' as const, source: page.title })),
+    ...results.recipes.map((recipe) => ({ entityType: 'recipe' as const, entityId: recipe._id, field: 'title' as const, source: recipe.title })),
+    ...results.tasks.map((task) => ({ entityType: 'task' as const, entityId: task._id, field: 'title' as const, source: task.title })),
+  ])
 
   useEffect(() => {
     if (!open) return
@@ -71,6 +81,7 @@ export function SearchPalette() {
     anyResults,
     createItem,
     go,
+    localized,
   }
 
   return createPortal(
@@ -152,6 +163,7 @@ function SearchResults({
   anyResults,
   createItem,
   go,
+  localized,
 }: {
   q: string
   query: string
@@ -162,6 +174,7 @@ function SearchResults({
   anyResults: boolean
   createItem: (title: string) => void
   go: (path: string) => void
+  localized: ReturnType<typeof useLocalizedFields>
 }) {
   const { t } = useTranslation()
   return (
@@ -191,14 +204,14 @@ function SearchResults({
       {items.length > 0 && (
         <Group label={t('search.group.items')}>
           {items.map((p) => (
-            <ResultRow key={p._id} title={p.title} sub={p.location} onClick={() => go(pagePath(p))} />
+            <ResultRow key={p._id} title={localized.textFor({ entityType: 'page', entityId: p._id, field: 'title', source: p.title })} sub={p.location ? localized.textFor({ entityType: 'page', entityId: p._id, field: 'location', source: p.location }) : undefined} onClick={() => go(pagePath(p))} />
           ))}
         </Group>
       )}
       {rules.length > 0 && (
         <Group label={t('search.group.rules')}>
           {rules.map((p) => (
-            <ResultRow key={p._id} title={p.title} onClick={() => go(pagePath(p))} />
+            <ResultRow key={p._id} title={localized.textFor({ entityType: 'page', entityId: p._id, field: 'title', source: p.title })} onClick={() => go(pagePath(p))} />
           ))}
         </Group>
       )}
@@ -207,7 +220,7 @@ function SearchResults({
           {recipes.map((recipe) => (
             <ResultRow
               key={recipe._id}
-              title={wikiPlainText(recipe.title)}
+              title={wikiPlainText(localized.textFor({ entityType: 'recipe', entityId: recipe._id, field: 'title', source: recipe.title }))}
               sub={recipe.sourceDomain}
               onClick={() => go(recordPath('recipe', recipe._id))}
             />
@@ -219,7 +232,7 @@ function SearchResults({
           {taskMatches.map((p) => (
             <ResultRow
               key={p._id}
-              title={wikiPlainText(p.title)}
+              title={wikiPlainText(localized.textFor({ entityType: 'task', entityId: p._id, field: 'title', source: p.title }))}
               sub={p.dueDate ? formatInSG(new Date(p.dueDate + 'T12:00:00').getTime(), { day: 'numeric', month: 'short' }) : undefined}
               onClick={() => go(recordPath('task', p._id))}
             />

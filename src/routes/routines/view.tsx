@@ -21,6 +21,7 @@ import {
 import { weekdayName } from '@/lib/date'
 import { pagePath, recordPath } from '@/lib/record-route'
 import { wikiAuthoringText, wikiPlainText } from '@/lib/wiki'
+import { useLocalizedFields } from '@/data/useLocalizedFields'
 
 export default function RoutineView() {
   const { t } = useTranslation()
@@ -50,6 +51,15 @@ export default function RoutineView() {
   const authoringNote = routine && allPages
     ? wikiAuthoringText(routine.description ?? '', allPages)
     : routine?.description ?? ''
+  const localized = useLocalizedFields(
+    routine
+      ? [
+          { entityType: 'routine' as const, entityId: routine._id, field: 'title' as const, source: routine.title },
+          ...(routine.description ? [{ entityType: 'routine' as const, entityId: routine._id, field: 'description' as const, source: routine.description }] : []),
+          ...(linkedPage ? [{ entityType: 'page' as const, entityId: linkedPage._id, field: 'title' as const, source: linkedPage.title }] : []),
+        ]
+      : [],
+  )
 
   useEffect(() => {
     if (!editingTitle) setTitleDraft(authoringTitle)
@@ -195,11 +205,11 @@ export default function RoutineView() {
               }}
               className="w-full cursor-text rounded-xs px-2 py-1 text-left text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink transition hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 active:bg-surface-active"
             >
-              <Markdown content={routine.title} inline />
+              <Markdown content={localized.textFor({ entityType: 'routine', entityId: routine._id, field: 'title', source: routine.title })} inline />
             </h1>
           ) : (
             <h1 className="min-w-0 px-2 py-1 text-[28px] font-semibold leading-tight tracking-[-0.02em] text-ink">
-              <Markdown content={routine.title} inline />
+              <Markdown content={localized.textFor({ entityType: 'routine', entityId: routine._id, field: 'title', source: routine.title })} inline />
             </h1>
           )}
         </div>
@@ -243,13 +253,13 @@ export default function RoutineView() {
               className="min-h-11 w-full rounded-xs px-2 py-2 text-left text-[17px] leading-[1.6] transition hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 active:bg-surface-active"
             >
               {routine.description ? (
-                <Markdown content={routine.description} />
+                <Markdown content={localized.textFor({ entityType: 'routine', entityId: routine._id, field: 'description', source: routine.description })} />
               ) : (
                 <span className="text-text-tertiary">{t('routine.field.descriptionPlaceholder')}</span>
               )}
             </div>
           ) : routine.description ? (
-            <Markdown content={routine.description} />
+            <Markdown content={localized.textFor({ entityType: 'routine', entityId: routine._id, field: 'description', source: routine.description })} />
           ) : null}
         </section>
 
@@ -263,7 +273,7 @@ export default function RoutineView() {
           <div className="mt-6 border-t border-border-subtle pt-5">
             <div className="label-caps mb-2 text-text-tertiary">{t('routine.field.linkPage')}</div>
             <Link className="wikilink text-[16px]" to={pagePath(linkedPage)}>
-              {linkedPage.title}
+              {localized.textFor({ entityType: 'page', entityId: linkedPage._id, field: 'title', source: linkedPage.title })}
             </Link>
           </div>
         )}

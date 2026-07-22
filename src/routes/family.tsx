@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   Copy,
@@ -37,6 +37,7 @@ export default function Family() {
   const navigate = useNavigate()
   const family = useCurrentFamily()
   const isOwner = family?.role === 'owner'
+  const canInvite = family?.role === 'owner' || family?.role === 'admin'
   const mine = useMyFamilies()
   const members = useListMembers(family?._id)
   const setRole = useSetMemberRole()
@@ -81,7 +82,7 @@ export default function Family() {
     )
   }
 
-  const inviteUrl = `${window.location.origin}/invite/${family.inviteToken}`
+  const inviteUrl = canInvite ? `${window.location.origin}/invite/${family.inviteToken}` : ''
   const currentFamily = family
 
   async function saveFamilyName() {
@@ -159,36 +160,37 @@ export default function Family() {
         </p>
       </section>
 
-      {/* Invite link */}
-      <section className="page-px py-4 border-t border-border-subtle">
-        <h2 className="label-caps text-text-tertiary mb-2">{t('family.inviteLink')}</h2>
-        <div className="flex items-center gap-2">
-          <input
-            readOnly
-            value={inviteUrl}
-            className="flex-1 h-11 px-3 rounded-xs bg-background border border-border-line text-text-secondary mono-sm truncate"
-          />
-          <Button variant="secondary" size="icon" onClick={copyInvite} aria-label={t('family.copyInvite')}>
-            {copied ? <Check size={18} /> : <Copy size={18} />}
-          </Button>
-        </div>
-        {isOwner && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="mt-2"
-            leftIcon={<ArrowsClockwise size={16} aria-hidden="true" />}
-            onClick={async () => {
-              await regenerate(family._id)
-            }}
-          >
-            {t('family.regenerateInvite')}
-          </Button>
-        )}
-        <p className="text-xs text-text-tertiary mt-2">
-          {t('family.inviteDescription')} {isOwner ? t('family.inviteOwnerDescription') : ''}
-        </p>
-      </section>
+      {canInvite && (
+        <section className="page-px py-4 border-t border-border-subtle">
+          <h2 className="label-caps text-text-tertiary mb-2">{t('family.inviteLink')}</h2>
+          <div className="flex items-center gap-2">
+            <input
+              readOnly
+              value={inviteUrl}
+              className="flex-1 h-11 px-3 rounded-xs bg-background border border-border-line text-text-secondary mono-sm truncate"
+            />
+            <Button variant="secondary" size="icon" onClick={copyInvite} aria-label={t('family.copyInvite')}>
+              {copied ? <Check size={18} /> : <Copy size={18} />}
+            </Button>
+          </div>
+          {isOwner && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-2"
+              leftIcon={<ArrowsClockwise size={16} aria-hidden="true" />}
+              onClick={async () => {
+                await regenerate(family._id)
+              }}
+            >
+              {t('family.regenerateInvite')}
+            </Button>
+          )}
+          <p className="text-xs text-text-tertiary mt-2">
+            {t('family.inviteDescription')} {isOwner ? t('family.inviteOwnerDescription') : ''}
+          </p>
+        </section>
+      )}
 
       {/* Members + roles */}
       <section className="border-t border-border-subtle">
@@ -307,7 +309,8 @@ export default function Family() {
         </section>
       )}
 
-      {/* Switch family (if multiple) */}
+      {/* A household can be created through the onboarding/billing flow.
+          Existing members only need to switch families here. */}
       {mine.length > 1 && (
         <section className="border-t border-border-subtle">
           <h2 className="label-caps text-text-tertiary page-px pt-4 pb-2">{t('family.switch')}</h2>
@@ -333,14 +336,6 @@ export default function Family() {
               </li>
             ))}
           </ul>
-          <div className="page-px pt-2">
-            <Link
-              to="/family/new"
-              className="inline-flex items-center gap-2 text-sm text-accent"
-            >
-              <Plus size={16} aria-hidden="true" /> {t('family.createAnother')}
-            </Link>
-          </div>
         </section>
       )}
 

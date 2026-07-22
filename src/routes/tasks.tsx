@@ -14,7 +14,7 @@ import {
   useToggleRoutineCompletion,
   useToggleTaskDone,
 } from '@/data/hooks'
-import { useLocalizedTaskFields } from '@/data/useLocalizedFields'
+import { useLocalizedFields } from '@/data/useLocalizedFields'
 import { cn } from '@/lib/cn'
 import type { Doc } from '@convex/_generated/dataModel'
 import { todayInSG, addDaysISO, dateLabel, weekdayShort, weekdayName } from '@/lib/date'
@@ -32,10 +32,14 @@ function RoutineRow({
   routine,
   done,
   date,
+  title,
+  description,
 }: {
   routine: Doc<'routines'>
   done: boolean
   date: string
+  title: string
+  description: string
 }) {
   const navigate = useNavigate()
   const toggle = useToggleRoutineCompletion()
@@ -44,11 +48,11 @@ function RoutineRow({
   return (
     <CheckRow
       checked={done}
-      title={<Markdown content={routine.title} inline />}
+      title={<Markdown content={title} inline />}
       subtitle={
-        routine.description ? (
+        description ? (
           <span className="block">
-            <Markdown content={routine.description} inline />
+            <Markdown content={description} inline />
           </span>
         ) : undefined
       }
@@ -85,14 +89,18 @@ function DaySection({
   const tasks = isToday
     ? data?.tasks ?? []
     : data?.tasks.filter((t) => t.dueDate === date) ?? []
-  const localized = useLocalizedTaskFields(
-    tasks.map((task) => ({
-      entityType: 'task',
+  const localized = useLocalizedFields([
+    ...tasks.map((task) => ({
+      entityType: 'task' as const,
       entityId: task._id,
-      field: 'title',
+      field: 'title' as const,
       source: task.title,
     })),
-  )
+    ...data?.routines.flatMap((routine) => [
+      { entityType: 'routine' as const, entityId: routine._id, field: 'title' as const, source: routine.title },
+      ...(routine.description ? [{ entityType: 'routine' as const, entityId: routine._id, field: 'description' as const, source: routine.description }] : []),
+    ]) ?? [],
+  ])
 
   if (!data) return null
 
@@ -109,6 +117,8 @@ function DaySection({
             routine={routine}
             done={routine.isDone}
             date={date}
+            title={localized.textFor({ entityType: 'routine', entityId: routine._id, field: 'title', source: routine.title })}
+            description={routine.description ? localized.textFor({ entityType: 'routine', entityId: routine._id, field: 'description', source: routine.description }) : ''}
           />
         ))}
         {tasks.map((task) => (
@@ -116,7 +126,7 @@ function DaySection({
             key={task._id}
             checked={task.status === 'done'}
             title={
-              <Markdown content={localized.textFor(task._id, 'title', task.title)} inline />
+              <Markdown content={localized.textFor({ entityType: 'task', entityId: task._id, field: 'title', source: task.title })} inline />
             }
             onToggle={() => void toggleTaskDone(task._id)}
             onOpen={() => navigate(recordPath('task', task._id))}
@@ -140,6 +150,9 @@ function UpcomingSection({
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
   const { t } = useTranslation()
+  const localized = useLocalizedFields(items.map((item) => item.kind === 'routine'
+    ? { entityType: 'routine' as const, entityId: item.routineId, field: 'title' as const, source: item.title }
+    : { entityType: 'task' as const, entityId: item.taskId, field: 'title' as const, source: item.title }))
   if (items.length === 0) return null
 
   // Group items by date (already sorted ascending by the query).
@@ -214,7 +227,9 @@ function UpcomingSection({
                         className="page-px py-2.5 min-h-[44px] flex cursor-pointer items-center justify-between gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
                       >
                         <span className="min-w-0 truncate text-[15px] text-text-primary">
-                          <Markdown content={it.title} inline />
+                          <Markdown content={localized.textFor(it.kind === 'routine'
+                            ? { entityType: 'routine', entityId: it.routineId, field: 'title', source: it.title }
+                            : { entityType: 'task', entityId: it.taskId, field: 'title', source: it.title })} inline />
                         </span>
                         {it.kind === 'routine' && (
                           <span className="mono-sm text-text-tertiary whitespace-nowrap">
@@ -242,6 +257,10 @@ export default function Tasks() {
   const tomorrowData = useToday(tomorrow)
   const upcoming = useUpcomingTasks(tomorrow)
   const toggleTaskDone = useToggleTaskDone()
+  const visibleRuleTranslations = useLocalizedFields((todayData?.pinnedRules ?? []).flatMap((rule) => [
+    { entityType: 'page' as const, entityId: rule._id, field: 'title' as const, source: rule.title },
+    ...(rule.content ? [{ entityType: 'page' as const, entityId: rule._id, field: 'content' as const, source: rule.content }] : []),
+  ]))
 
   if (!todayData) {
     return (
@@ -260,7 +279,7 @@ export default function Tasks() {
         <div className="mt-3 flex flex-col gap-2">
           {todayData.pinnedRules.map((rule) => (
             <WarningCallout key={rule._id} title={t('today.ruleReminder')}>
-              <Markdown content={rule.content} />
+              <Markdown content={visibleRuleTranslations.textFor({ entityType: 'page', entityId: rule._id, field: 'content', source: rule.content })} />
             </WarningCallout>
           ))}
         </div>

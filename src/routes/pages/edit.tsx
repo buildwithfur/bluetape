@@ -81,9 +81,6 @@ export default function PageEdit() {
         title: title.trim(),
         type,
         content: type === 'item' ? content.trim() : isEdit ? page?.content ?? '' : '',
-        // These legacy fields are no longer authored in the item form. Preserve
-        // existing values during edits instead of deleting stored data.
-        localName: isEdit && type === 'item' ? page?.localName : undefined,
         location: isEdit && type === 'item' ? page?.location : undefined,
         photoId: type === 'item' ? photoId : undefined,
         pinnedToToday: type === 'rule' ? pinnedToToday : undefined,

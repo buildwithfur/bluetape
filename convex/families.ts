@@ -42,8 +42,9 @@ export const listMine = query({
     // Attach the user's role + displayName in each family for the UI.
     return families.map((f) => {
       const membership = memberships.find((m) => m.familyId === f._id)!;
+      const { inviteToken: _inviteToken, ...family } = f;
       return {
-        ...f,
+        ...family,
         role: isOwner(f, userId) ? "owner" : membership.role,
         displayName: membership.displayName,
       };
@@ -59,9 +60,14 @@ export const get = query({
       ctx,
       args.familyId,
     );
+    const { inviteToken, ...familyWithoutInviteToken } = family;
+    const role = isOwner(family, userId) ? "owner" : membership.role;
     return {
-      ...family,
-      role: isOwner(family, userId) ? "owner" : membership.role,
+      ...familyWithoutInviteToken,
+      // An invite token is a bearer capability: regular members must not
+      // receive it merely because they can view the family.
+      inviteToken: role === "user" ? null : inviteToken,
+      role,
       displayName: membership.displayName,
     };
   },
