@@ -3,21 +3,16 @@ import { Link, useNavigate } from 'react-router-dom'
 import { CaretRight, SignOut } from '@phosphor-icons/react'
 import { TopBar } from '@/components/AppShell'
 import { useAuthActions } from '@convex-dev/auth/react'
-import { useCurrentRole } from '@/data/hooks'
 import { appVersion } from '@/lib/app-version'
 
 export default function More() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { signOut } = useAuthActions()
-  const role = useCurrentRole()
-
   const entries = [
     { to: '/more/rules', label: t('more.rules'), hint: t('more.rulesHint') },
     { to: '/routines', label: t('nav.routines'), hint: t('more.routinesHint') },
-    ...(role === 'owner' || role === 'admin'
-      ? [{ to: '/family', label: t('more.family'), hint: t('more.familyHint') }]
-      : []),
+    { to: '/family', label: t('more.family'), hint: t('more.familyHint') },
     { to: '/language', label: t('settings.language'), hint: t('settings.hint') },
   ]
 

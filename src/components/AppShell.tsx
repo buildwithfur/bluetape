@@ -109,10 +109,7 @@ export function SideRail() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const { signOut } = useAuthActions()
-  const role = useCurrentRole()
-  const tabs = role === 'admin' || role === 'owner'
-    ? [...DESKTOP_TABS.slice(0, -1), FAMILY_TAB, DESKTOP_TABS.at(-1)!]
-    : DESKTOP_TABS
+  const tabs = [...DESKTOP_TABS.slice(0, -1), FAMILY_TAB, DESKTOP_TABS.at(-1)!]
   return (
     <nav
       aria-label={t('nav.primary')}
