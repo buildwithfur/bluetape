@@ -35,6 +35,7 @@ import type * as translation_validators from "../translation/validators.js";
 import type * as translationActions from "../translationActions.js";
 import type * as translations from "../translations.js";
 import type * as userProfiles from "../userProfiles.js";
+import type * as usernameAuth from "../usernameAuth.js";
 import type * as wiki from "../wiki.js";
 
 import type {
@@ -71,6 +72,7 @@ declare const fullApi: ApiFromModules<{
   translationActions: typeof translationActions;
   translations: typeof translations;
   userProfiles: typeof userProfiles;
+  usernameAuth: typeof usernameAuth;
   wiki: typeof wiki;
 }>;
 

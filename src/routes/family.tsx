@@ -9,6 +9,8 @@ import {
   SignOut,
   Trash,
   CaretDown,
+  ShareNetwork,
+  Key,
 } from '@phosphor-icons/react'
 import { TopBar } from '@/components/AppShell'
 import { Button } from '@/components/Button'
@@ -23,6 +25,8 @@ import {
   useRemoveMember,
   useLeaveFamily,
   useRegenerateInviteToken,
+  useCreateUsernameUser,
+  useChangeUsernamePassword,
   useRenameFamily,
   useDeleteFamily,
   useSetCurrentFamily,
@@ -50,6 +54,8 @@ export default function Family() {
   const apiKeys = useApiKeys(isOwner ? family?._id : undefined)
   const createApiKey = useCreateApiKey()
   const revokeApiKey = useRevokeApiKey()
+  const createUsernameUser = useCreateUsernameUser()
+  const changeUsernamePassword = useChangeUsernamePassword()
 
   const [copied, setCopied] = useState(false)
   const [editingName, setEditingName] = useState(false)
@@ -63,6 +69,20 @@ export default function Family() {
   const [revealedKey, setRevealedKey] = useState<string | null>(null)
   const [revealedLabel, setRevealedLabel] = useState<string | null>(null)
   const [copiedKey, setCopiedKey] = useState(false)
+  const [createUserOpen, setCreateUserOpen] = useState(false)
+  const [createUserBusy, setCreateUserBusy] = useState(false)
+  const [createUserError, setCreateUserError] = useState<string | null>(null)
+  const [newUserDisplayName, setNewUserDisplayName] = useState('')
+  const [newUsername, setNewUsername] = useState('')
+  const [newUserPassword, setNewUserPassword] = useState('')
+  const [newUserPasswordConfirm, setNewUserPasswordConfirm] = useState('')
+  const [createdCredentials, setCreatedCredentials] = useState<{ username: string; password: string } | null>(null)
+  const [passwordTarget, setPasswordTarget] = useState<{ userId: Id<'users'>; username: string; own: boolean } | null>(null)
+  const [passwordBusy, setPasswordBusy] = useState(false)
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [replacementPassword, setReplacementPassword] = useState('')
+  const [replacementPasswordConfirm, setReplacementPasswordConfirm] = useState('')
   const familyNameRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -108,6 +128,99 @@ export default function Family() {
     void navigator.clipboard?.writeText(inviteUrl)
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
+  }
+
+  function closeCreateUser() {
+    setCreateUserOpen(false)
+    setCreateUserError(null)
+    setNewUserDisplayName('')
+    setNewUsername('')
+    setNewUserPassword('')
+    setNewUserPasswordConfirm('')
+  }
+
+  async function submitCreateUser(event: React.FormEvent) {
+    event.preventDefault()
+    setCreateUserError(null)
+    if (!newUserDisplayName.trim() || !newUsername.trim()) {
+      setCreateUserError(t('family.usernameUserRequired'))
+      return
+    }
+    if (newUserPassword.length < 8) {
+      setCreateUserError(t('login.passwordRequirements', { count: 8 }))
+      return
+    }
+    if (newUserPassword !== newUserPasswordConfirm) {
+      setCreateUserError(t('login.passwordsDoNotMatch'))
+      return
+    }
+    setCreateUserBusy(true)
+    try {
+      if (!currentFamily) return
+      const result = await createUsernameUser(
+        currentFamily._id,
+        newUsername,
+        newUserDisplayName,
+        newUserPassword,
+      )
+      setCreatedCredentials({ username: result.username, password: newUserPassword })
+      closeCreateUser()
+    } catch (e) {
+      setCreateUserError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setCreateUserBusy(false)
+    }
+  }
+
+  async function shareCredentials() {
+    if (!createdCredentials) return
+    const text = `${t('app.name')} login\nUsername: ${createdCredentials.username}\nPassword: ${createdCredentials.password}`
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: t('app.name'), text })
+        return
+      } catch {
+        // The user may cancel the native share sheet; keep the credentials visible.
+      }
+    }
+    await navigator.clipboard?.writeText(text)
+  }
+
+  function openPasswordChange(userId: Id<'users'>, username: string, own: boolean) {
+    setPasswordError(null)
+    setCurrentPassword('')
+    setReplacementPassword('')
+    setReplacementPasswordConfirm('')
+    setPasswordTarget({ userId, username, own })
+  }
+
+  async function submitPasswordChange(event: React.FormEvent) {
+    event.preventDefault()
+    if (!passwordTarget) return
+    setPasswordError(null)
+    if (replacementPassword.length < 8) {
+      setPasswordError(t('login.passwordRequirements', { count: 8 }))
+      return
+    }
+    if (replacementPassword !== replacementPasswordConfirm) {
+      setPasswordError(t('login.passwordsDoNotMatch'))
+      return
+    }
+    setPasswordBusy(true)
+    try {
+      if (!currentFamily) return
+      await changeUsernamePassword(
+        currentFamily._id,
+        passwordTarget.userId,
+        replacementPassword,
+        passwordTarget.own ? currentPassword : undefined,
+      )
+      setPasswordTarget(null)
+    } catch (e) {
+      setPasswordError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setPasswordBusy(false)
+    }
   }
 
   return (
@@ -192,7 +305,22 @@ export default function Family() {
         </section>
       )}
 
-      {/* Members + roles */}
+      {isOwner && (
+        <section className="page-px py-4 border-t border-border-subtle">
+          <h2 className="label-caps text-text-tertiary mb-2">{t('family.usernameUsers')}</h2>
+          <Button
+            variant="secondary"
+            leftIcon={<Plus size={16} aria-hidden="true" />}
+            onClick={() => {
+              setCreateUserError(null)
+              setCreateUserOpen(true)
+            }}
+          >
+            {t('family.createUsernameUser')}
+          </Button>
+        </section>
+      )}
+
       <section className="border-t border-border-subtle">
         <h2 className="label-caps text-text-tertiary page-px pt-4 pb-2">{t('family.members')}</h2>
         {!members.length ? (
@@ -211,37 +339,52 @@ export default function Family() {
                   </div>
                   <div className="mono-sm text-text-tertiary">
                     {t(`family.role.${m.isOwner ? 'owner' : m.role}`)}
+                    {m.username && <span> · @{m.username}</span>}
                   </div>
                 </div>
-                {isOwner && !m.isOwner && (
+                {(m.username && (m.you || isOwner)) || (isOwner && !m.isOwner) ? (
                   <div className="flex items-center gap-2">
-                    <RoleMenu
-                      name={m.displayName}
-                      role={m.role}
-                      onChange={async (nextRole) => {
-                        setError(null)
-                        try {
-                          await setRole(
-                            family._id,
-                            m.userId as Id<'users'>,
-                            nextRole,
-                          )
-                        } catch (e) {
-                          setError(e instanceof Error ? e.message : String(e))
-                          throw e
-                        }
-                      }}
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => void removeMember(family._id, m.userId as Id<'users'>)}
-                      aria-label={t('family.removeMember')}
-                    >
-                      <Trash size={16} className="text-error-accent" />
-                    </Button>
+                    {m.username && (m.you || isOwner) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={t('family.changePasswordFor', { name: m.displayName })}
+                        onClick={() => openPasswordChange(m.userId as Id<'users'>, m.username as string, Boolean(m.you))}
+                      >
+                        <Key size={16} />
+                      </Button>
+                    )}
+                    {isOwner && !m.isOwner && (
+                      <>
+                        <RoleMenu
+                          name={m.displayName}
+                          role={m.role}
+                          onChange={async (nextRole) => {
+                            setError(null)
+                            try {
+                              await setRole(
+                                currentFamily._id,
+                                m.userId as Id<'users'>,
+                                nextRole,
+                              )
+                            } catch (e) {
+                              setError(e instanceof Error ? e.message : String(e))
+                              throw e
+                            }
+                          }}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => void removeMember(family._id, m.userId as Id<'users'>)}
+                          aria-label={t('family.removeMember')}
+                        >
+                          <Trash size={16} className="text-error-accent" />
+                        </Button>
+                      </>
+                    )}
                   </div>
-                )}
+                ) : null}
               </li>
             ))}
           </ul>
@@ -371,6 +514,143 @@ export default function Family() {
           </Button>
         )}
       </section>
+
+      <BottomSheet
+        open={createUserOpen}
+        onClose={() => {
+          if (!createUserBusy) closeCreateUser()
+        }}
+        title={t('family.createUsernameUser')}
+        footer={
+          <>
+            <Button variant="ghost" onClick={closeCreateUser} disabled={createUserBusy}>
+              {t('action.cancel')}
+            </Button>
+            <Button type="submit" form="create-username-user-form" variant="primary" disabled={createUserBusy}>
+              {createUserBusy ? t('common.loading') : t('action.create')}
+            </Button>
+          </>
+        }
+      >
+        <form id="create-username-user-form" onSubmit={(event) => void submitCreateUser(event)} className="space-y-3">
+          <label className="flex flex-col gap-1.5">
+            <span className="label-caps text-text-tertiary">{t('login.displayName')}</span>
+            <input
+              value={newUserDisplayName}
+              onChange={(event) => setNewUserDisplayName(event.target.value)}
+              autoComplete="name"
+              className="h-11 rounded-xs border border-border-line bg-surface px-3 text-text-primary focus:border-accent focus:outline-none"
+            />
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="label-caps text-text-tertiary">{t('login.username')}</span>
+            <input
+              value={newUsername}
+              onChange={(event) => setNewUsername(event.target.value.toLowerCase())}
+              autoComplete="username"
+              className="h-11 rounded-xs border border-border-line bg-surface px-3 text-text-primary focus:border-accent focus:outline-none"
+            />
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="label-caps text-text-tertiary">{t('login.password')}</span>
+            <input
+              type="password"
+              value={newUserPassword}
+              onChange={(event) => setNewUserPassword(event.target.value)}
+              autoComplete="new-password"
+              className="h-11 rounded-xs border border-border-line bg-surface px-3 text-text-primary focus:border-accent focus:outline-none"
+            />
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="label-caps text-text-tertiary">{t('login.confirmPassword')}</span>
+            <input
+              type="password"
+              value={newUserPasswordConfirm}
+              onChange={(event) => setNewUserPasswordConfirm(event.target.value)}
+              autoComplete="new-password"
+              className="h-11 rounded-xs border border-border-line bg-surface px-3 text-text-primary focus:border-accent focus:outline-none"
+            />
+          </label>
+          {createUserError && <p role="alert" className="text-sm text-error-accent">{createUserError}</p>}
+        </form>
+      </BottomSheet>
+
+      <BottomSheet
+        open={createdCredentials !== null}
+        onClose={() => setCreatedCredentials(null)}
+        title={t('family.userCredentials')}
+        footer={
+          <>
+            <Button variant="secondary" leftIcon={<ShareNetwork size={16} />} onClick={() => void shareCredentials()}>
+              {t('family.shareCredentials')}
+            </Button>
+            <Button variant="primary" onClick={() => setCreatedCredentials(null)}>
+              {t('action.close')}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-text-secondary mb-3">{t('family.credentialsWarning')}</p>
+        <div className="space-y-2 rounded-xs bg-background p-3 mono-sm text-text-secondary">
+          <div>{t('family.usernameLabel')}: {createdCredentials?.username}</div>
+          <div>{t('family.passwordLabel')}: {createdCredentials?.password}</div>
+        </div>
+      </BottomSheet>
+
+      <BottomSheet
+        open={passwordTarget !== null}
+        onClose={() => {
+          if (!passwordBusy) setPasswordTarget(null)
+        }}
+        title={passwordTarget?.own ? t('family.changeOwnPassword') : t('family.changePassword')}
+        footer={(
+          <>
+            <Button variant="ghost" onClick={() => setPasswordTarget(null)} disabled={passwordBusy}>
+              {t('action.cancel')}
+            </Button>
+            <Button type="submit" form="change-username-password-form" variant="primary" disabled={passwordBusy}>
+              {passwordBusy ? t('common.loading') : t('action.save')}
+            </Button>
+          </>
+        )}
+      >
+        <form id="change-username-password-form" onSubmit={(event) => void submitPasswordChange(event)} className="space-y-3">
+          {passwordTarget?.own && (
+            <label className="flex flex-col gap-1.5">
+              <span className="label-caps text-text-tertiary">{t('family.currentPassword')}</span>
+              <input
+                type="password"
+                value={currentPassword}
+                onChange={(event) => setCurrentPassword(event.target.value)}
+                autoComplete="current-password"
+                className="h-11 rounded-xs border border-border-line bg-surface px-3 text-text-primary focus:border-accent focus:outline-none"
+              />
+            </label>
+          )}
+          <p className="mono-sm text-text-tertiary">@{passwordTarget?.username}</p>
+          <label className="flex flex-col gap-1.5">
+            <span className="label-caps text-text-tertiary">{t('login.newPassword')}</span>
+            <input
+              type="password"
+              value={replacementPassword}
+              onChange={(event) => setReplacementPassword(event.target.value)}
+              autoComplete="new-password"
+              className="h-11 rounded-xs border border-border-line bg-surface px-3 text-text-primary focus:border-accent focus:outline-none"
+            />
+          </label>
+          <label className="flex flex-col gap-1.5">
+            <span className="label-caps text-text-tertiary">{t('login.confirmPassword')}</span>
+            <input
+              type="password"
+              value={replacementPasswordConfirm}
+              onChange={(event) => setReplacementPasswordConfirm(event.target.value)}
+              autoComplete="new-password"
+              className="h-11 rounded-xs border border-border-line bg-surface px-3 text-text-primary focus:border-accent focus:outline-none"
+            />
+          </label>
+          {passwordError && <p role="alert" className="text-sm text-error-accent">{passwordError}</p>}
+        </form>
+      </BottomSheet>
 
       <BottomSheet
         open={confirmDelete}

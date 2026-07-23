@@ -13,6 +13,8 @@ import {
   isValidAuthCode,
   isValidEmail,
   isValidPassword,
+  isValidUsername,
+  normalizeUsername,
 } from '@/lib/auth-validation'
 
 type AuthView = 'signIn' | 'signUp' | 'verifyEmail' | 'forgotPassword' | 'resetPassword'
@@ -25,6 +27,8 @@ export default function Login() {
   const authProviders = useQuery(api.publicConfig.authProviders, {})
   const [view, setView] = useState<AuthView>('signIn')
   const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
+  const [loginMode, setLoginMode] = useState<'email' | 'username'>('email')
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [code, setCode] = useState('')
@@ -114,7 +118,14 @@ export default function Login() {
     setError(null)
     setNotice(null)
 
-    if (!validateEmail()) return
+    if (view === 'signIn' && loginMode === 'username') {
+      if (!isValidUsername(username)) {
+        setError(t('login.invalidUsername'))
+        return
+      }
+    } else if (!validateEmail()) {
+      return
+    }
     if (view === 'signUp' && !displayName.trim()) {
       setError(t('login.displayNameRequired'))
       return
@@ -148,14 +159,22 @@ export default function Login() {
           setNotice(t('login.verificationCodeSent'))
         }
       } else if (view === 'signIn') {
-        const result = await signIn('password', {
-          email: email.trim(),
-          password,
-          flow: 'signIn',
-        })
-        if (!result.signingIn) {
-          changeView('verifyEmail')
-          setNotice(t('login.verificationCodeSent'))
+        if (loginMode === 'username') {
+          await signIn('username-password', {
+            username: normalizeUsername(username),
+            password,
+            flow: 'signIn',
+          })
+        } else {
+          const result = await signIn('password', {
+            email: email.trim(),
+            password,
+            flow: 'signIn',
+          })
+          if (!result.signingIn) {
+            changeView('verifyEmail')
+            setNotice(t('login.verificationCodeSent'))
+          }
         }
       } else if (view === 'verifyEmail') {
         await signIn('password', {
@@ -242,7 +261,9 @@ export default function Login() {
         ? t('login.resetPasswordInstructions', { email: email.trim() })
         : null
 
-  const showEmailInput = view === 'signIn' || view === 'signUp' || view === 'forgotPassword'
+  const showEmailInput =
+    (view === 'signIn' && loginMode === 'email') || view === 'signUp' || view === 'forgotPassword'
+  const showUsernameInput = view === 'signIn' && loginMode === 'username'
   const showCurrentPassword = view === 'signIn' || view === 'signUp'
   const showCode = view === 'verifyEmail' || view === 'resetPassword'
   const showOAuth =
@@ -333,6 +354,34 @@ export default function Login() {
             </label>
           )}
 
+          {view === 'signIn' && (
+            <div className="flex gap-1 rounded-xs bg-surface-hover p-1">
+              {(['email', 'username'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setLoginMode(mode)}
+                  className={`flex-1 rounded-xs px-3 py-2 text-sm font-medium ${loginMode === mode ? 'bg-surface text-ink shadow-sm' : 'text-text-tertiary'}`}
+                >
+                  {t(`login.${mode}`)}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {showUsernameInput && (
+            <label className="flex flex-col gap-1.5">
+              <span className="label-caps text-text-tertiary">{t('login.username')}</span>
+              <input
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+                autoComplete="username"
+                className="h-12 rounded-xs border border-border-line bg-surface px-3 text-text-primary placeholder:text-text-disabled focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
+                placeholder={t('login.usernamePlaceholder')}
+              />
+            </label>
+          )}
+
           {showEmailInput && (
             <label className="flex flex-col gap-1.5">
               <span className="label-caps text-text-tertiary">{t('login.email')}</span>
@@ -367,7 +416,7 @@ export default function Login() {
             </label>
           )}
 
-          {view === 'signIn' && authProviders?.passwordReset === true && (
+          {view === 'signIn' && loginMode === 'email' && authProviders?.passwordReset === true && (
             <button
               type="button"
               onClick={() => changeView('forgotPassword')}

@@ -6,7 +6,7 @@
  and switch between them. Role lives on `familyMembers`, never self-assigned.
 */
 import { useMemo } from 'react'
-import { useQuery, useMutation } from 'convex/react'
+import { useQuery, useMutation, useAction } from 'convex/react'
 import type { OptimisticLocalStore } from 'convex/browser'
 import { api } from '@convex/_generated/api'
 import type { Doc, Id } from '@convex/_generated/dataModel'
@@ -78,6 +78,24 @@ export function useLeaveFamily() {
 export function useRegenerateInviteToken() {
   const regen = useMutation(api.families.regenerateInviteToken)
   return (familyId: Id<'families'>) => regen({ familyId })
+}
+export function useCreateUsernameUser() {
+  const create = useAction(api.families.createUsernameUser)
+  return (
+    familyId: Id<'families'>,
+    username: string,
+    displayName: string,
+    password: string,
+  ) => create({ familyId, username, displayName, password })
+}
+export function useChangeUsernamePassword() {
+  const change = useAction(api.families.changeUsernamePassword)
+  return (
+    familyId: Id<'families'>,
+    targetUserId: Id<'users'>,
+    newPassword: string,
+    currentPassword?: string,
+  ) => change({ familyId, targetUserId, newPassword, currentPassword })
 }
 export function useRenameFamily() {
   const rename = useMutation(api.families.rename)

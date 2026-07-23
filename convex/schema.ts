@@ -275,8 +275,11 @@ export default defineSchema({
     currentFamilyId: v.optional(v.id("families")),
     // Operator-managed feature flag. Missing and false both mean disabled.
     autoTranslateEnabled: v.optional(v.boolean()),
+    // Present only for accounts that authenticate with username/password.
+    username: v.optional(v.string()),
   })
-    .index("userId", ["userId"]),
+    .index("userId", ["userId"])
+    .index("username", ["username"]),
 
   /** On-demand user-content translation cache. Authored fields stay source. */
   contentTranslations: defineTable(

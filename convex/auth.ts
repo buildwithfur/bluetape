@@ -7,6 +7,12 @@ import {
   getGoogleAuthCredentials,
   type AuthEmailSettings,
 } from "./lib/authSettings";
+import {
+  USERNAME_PASSWORD_PROVIDER,
+  usernameAccountId,
+  validateUsername,
+  validateUsernamePassword,
+} from "./usernameAuth";
 
 const AUTH_CODE_MAX_AGE_SECONDS = 15 * 60;
 
@@ -100,6 +106,17 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
         return {
           email: params.email as string,
           name: (params.displayName as string) ?? (params.email as string),
+        };
+      },
+    }),
+    Password({
+      id: USERNAME_PASSWORD_PROVIDER,
+      validatePasswordRequirements: validateUsernamePassword,
+      profile(params) {
+        const username = validateUsername(String(params.username ?? ""));
+        return {
+          email: usernameAccountId(username),
+          name: String(params.displayName ?? username),
         };
       },
     }),

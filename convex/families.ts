@@ -1,7 +1,28 @@
 import { v } from "convex/values";
-import { query, mutation } from "./_generated/server";
+import {
+  action,
+  internalMutation,
+  internalQuery,
+  mutation,
+  query,
+} from "./_generated/server";
+import { internal } from "./_generated/api";
 import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import {
+  getAuthSessionId,
+  getAuthUserId,
+  createAccount,
+  invalidateSessions,
+  modifyAccountCredentials,
+  retrieveAccount,
+} from "@convex-dev/auth/server";
+import {
+  USERNAME_PASSWORD_PROVIDER,
+  usernameAccountId,
+  validateUsername,
+  validateUsernamePassword,
+} from "./usernameAuth";
 import {
   requireUser,
   tryUser,
@@ -82,13 +103,20 @@ export const listMembers = query({
       .query("familyMembers")
       .withIndex("family", (q) => q.eq("familyId", args.familyId))
       .collect();
-    return members
-      .map((m) => ({
-        ...m,
-        isOwner: family.ownerUserId === m.userId,
-        you: m.userId === userId,
-      }))
-      .sort((a, b) => (a.isOwner ? -1 : b.isOwner ? 1 : a.joinedAt - b.joinedAt));
+    return (await Promise.all(
+      members.map(async (m) => {
+        const profile = await ctx.db
+          .query("userProfiles")
+          .withIndex("userId", (q) => q.eq("userId", m.userId))
+          .unique();
+        return {
+          ...m,
+          username: profile?.username ?? null,
+          isOwner: family.ownerUserId === m.userId,
+          you: m.userId === userId,
+        };
+      }),
+    )).sort((a, b) => (a.isOwner ? -1 : b.isOwner ? 1 : a.joinedAt - b.joinedAt));
   },
 });
 
@@ -109,6 +137,204 @@ export const getByInviteToken = query({
       ? (await getMembership(ctx, family._id, userId)) !== null
       : false;
     return { familyId: family._id, name: family.name, isMember };
+  },
+});
+
+export const validateUsernameUserCreation = internalQuery({
+  args: {
+    familyId: v.id("families"),
+    username: v.string(),
+    callerUserId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const family = await ctx.db.get(args.familyId);
+    if (!family) throw new Error("Family not found");
+    if (family.ownerUserId !== args.callerUserId) {
+      throw new Error("Only the family owner can perform this action");
+    }
+    const existingProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("username", (q) => q.eq("username", args.username))
+      .unique();
+    if (existingProfile) throw new Error("Username is already in use");
+    const existingAccount = await ctx.db
+      .query("authAccounts")
+      .withIndex("providerAndAccountId", (q) =>
+        q.eq("provider", USERNAME_PASSWORD_PROVIDER).eq("providerAccountId", usernameAccountId(args.username)),
+      )
+      .unique();
+    if (existingAccount) throw new Error("Username is already in use");
+  },
+});
+
+export const finalizeUsernameUser = internalMutation({
+  args: {
+    familyId: v.id("families"),
+    userId: v.id("users"),
+    username: v.string(),
+    displayName: v.string(),
+    createdBy: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const family = await ctx.db.get(args.familyId);
+    if (!family) throw new Error("Family not found");
+    // Actions span separate transactions. Recheck the authorization anchor
+    // after account creation, before attaching the account to the family.
+    if (family.ownerUserId !== args.createdBy) {
+      throw new Error("Only the family owner can perform this action");
+    }
+    const existingProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("userId", (q) => q.eq("userId", args.userId))
+      .unique();
+    if (existingProfile) throw new Error("User profile already exists");
+    const existingMembership = await getMembership(ctx, args.familyId, args.userId);
+    if (existingMembership) throw new Error("User is already a member of this family");
+    const now = Date.now();
+    await ctx.db.insert("userProfiles", {
+      userId: args.userId,
+      displayName: args.displayName,
+      username: args.username,
+      locale: "en",
+      timezone: "Asia/Singapore",
+      currentFamilyId: args.familyId,
+      autoTranslateEnabled: false,
+    });
+    await ctx.db.insert("familyMembers", {
+      familyId: args.familyId,
+      userId: args.userId,
+      role: "user",
+      displayName: args.displayName,
+      joinedAt: now,
+      invitedBy: args.createdBy,
+    });
+  },
+});
+
+/** Remove a newly-created auth account when its family attachment fails. */
+export const cleanupFailedUsernameUser = internalMutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, args) => {
+    const account = await ctx.db
+      .query("authAccounts")
+      .withIndex("userIdAndProvider", (q) =>
+        q.eq("userId", args.userId).eq("provider", USERNAME_PASSWORD_PROVIDER),
+      )
+      .unique();
+    if (account) await ctx.db.delete(account._id);
+    await ctx.db.delete(args.userId);
+  },
+});
+
+/** Create a username/password member after an owner authorizes it. */
+export const createUsernameUser = action({
+  args: {
+    familyId: v.id("families"),
+    username: v.string(),
+    displayName: v.string(),
+    password: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const callerUserId = await getAuthUserId(ctx);
+    if (!callerUserId) throw new Error("Not authenticated");
+    const username = validateUsername(args.username);
+    const displayName = args.displayName.trim();
+    if (!displayName) throw new Error("Display name cannot be empty");
+    validateUsernamePassword(args.password);
+    await ctx.runQuery((internal as any).families.validateUsernameUserCreation, {
+      familyId: args.familyId,
+      username,
+      callerUserId,
+    });
+    const accountId = usernameAccountId(username);
+    const { user } = await createAccount(ctx, {
+      provider: USERNAME_PASSWORD_PROVIDER,
+      account: { id: accountId, secret: args.password },
+      profile: { email: accountId, name: displayName },
+      shouldLinkViaEmail: false,
+      shouldLinkViaPhone: false,
+    });
+    try {
+      await ctx.runMutation((internal as any).families.finalizeUsernameUser, {
+        familyId: args.familyId,
+        userId: user._id,
+        username,
+        displayName,
+        createdBy: callerUserId,
+      });
+    } catch (error) {
+      await ctx.runMutation((internal as any).families.cleanupFailedUsernameUser, {
+        userId: user._id,
+      });
+      throw error;
+    }
+    return { userId: user._id, username };
+  },
+});
+
+export const validateUsernamePasswordChange = internalQuery({
+  args: {
+    familyId: v.id("families"),
+    targetUserId: v.id("users"),
+    callerUserId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    const targetProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("userId", (q) => q.eq("userId", args.targetUserId))
+      .unique();
+    if (!targetProfile?.username) throw new Error("This user does not use username login");
+    const targetMembership = await getMembership(ctx, args.familyId, args.targetUserId);
+    const family = await ctx.db.get(args.familyId);
+    if (!family || !targetMembership) {
+      throw new Error("User is not a member of this family");
+    }
+    if (args.callerUserId === args.targetUserId) {
+      return { username: targetProfile.username };
+    }
+    if (family.ownerUserId !== args.callerUserId) {
+      throw new Error("Only the family owner can perform this action");
+    }
+    return { username: targetProfile.username };
+  },
+});
+
+/** Change a username user's password, either by the user or a family admin. */
+export const changeUsernamePassword = action({
+  args: {
+    familyId: v.id("families"),
+    targetUserId: v.id("users"),
+    currentPassword: v.optional(v.string()),
+    newPassword: v.string(),
+  },
+  handler: async (ctx, args): Promise<{ username: string }> => {
+    const callerUserId = await getAuthUserId(ctx);
+    if (!callerUserId) throw new Error("Not authenticated");
+    validateUsernamePassword(args.newPassword);
+    const result = await ctx.runQuery((internal as any).families.validateUsernamePasswordChange, {
+      familyId: args.familyId,
+      targetUserId: args.targetUserId,
+      callerUserId,
+    });
+    const username: string = result.username;
+    if (callerUserId === args.targetUserId) {
+      if (!args.currentPassword) throw new Error("Current password is required");
+      const account = await retrieveAccount(ctx, {
+        provider: USERNAME_PASSWORD_PROVIDER,
+        account: { id: usernameAccountId(username), secret: args.currentPassword },
+      });
+      if (!account) throw new Error("Current password is incorrect");
+    }
+    await modifyAccountCredentials(ctx, {
+      provider: USERNAME_PASSWORD_PROVIDER,
+      account: { id: usernameAccountId(username), secret: args.newPassword },
+    });
+    const sessionId = callerUserId === args.targetUserId ? await getAuthSessionId(ctx) : null;
+    await invalidateSessions(ctx, {
+      userId: args.targetUserId,
+      ...(sessionId ? { except: [sessionId] } : {}),
+    });
+    return { username };
   },
 });
 
