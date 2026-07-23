@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.5.0](https://github.com/buildwithfur/bluetape/compare/v1.4.0...v1.5.0) (2026-07-23)
+
+
+### Features
+
+* **auth:** add owner-managed username accounts ([67d417b](https://github.com/buildwithfur/bluetape/commit/67d417bf699a7c827564b33d560d47b41c9e1590))
+
+
+### Bug Fixes
+
+* **auth:** simplify login heading ([60c7c53](https://github.com/buildwithfur/bluetape/commit/60c7c5302d304922668234e318b9d2632b65693e))
+* ignore stale pending translations in activity toast ([2c191c6](https://github.com/buildwithfur/bluetape/commit/2c191c65c61afbc1a5579560b85e0dc601d74380))
+* **translation:** support configurable reasoning ([18719d0](https://github.com/buildwithfur/bluetape/commit/18719d0b1a0d5f440cf7f8a3de6fe8f9ac11f996))
+
 ## [1.4.0](https://github.com/buildwithfur/bluetape/compare/v1.3.0...v1.4.0) (2026-07-22)
 
 
