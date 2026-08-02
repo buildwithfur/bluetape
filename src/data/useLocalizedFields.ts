@@ -3,6 +3,7 @@ import { useMutation, useQuery } from 'convex/react'
 import { api } from '@convex/_generated/api'
 import type { Id } from '@convex/_generated/dataModel'
 import { useCurrentProfile } from '@/data/hooks'
+import { isSupportedLocale, type SupportedLocale } from '@/i18n'
 
 export type LocalizedField =
   | { entityType: 'task'; entityId: Id<'tasks'>; field: 'title' | 'note'; source: string }
@@ -27,9 +28,10 @@ function fieldKey(field: Pick<LocalizedField, 'entityType' | 'entityId' | 'field
   return `${field.entityType}:${field.entityId}:${field.field}`
 }
 
-export function useLocalizedFields(fields: LocalizedField[]) {
+export function useLocalizedFields(fields: LocalizedField[], targetLocale?: SupportedLocale) {
   const profile = useCurrentProfile()
-  const enabled = profile?.autoTranslateEnabled === true
+  const locale = targetLocale ?? (profile?.locale && isSupportedLocale(profile.locale) ? profile.locale : undefined)
+  const enabled = profile?.autoTranslateEnabled === true && locale !== undefined
   const stableKey = fields
     .map((item) => `${fieldKey(item)}:${item.source}`)
     .join('\u0000')
@@ -41,7 +43,7 @@ export function useLocalizedFields(fields: LocalizedField[]) {
   )
   const response = useQuery(
     api.translations.getForFields,
-    enabled && refs.length > 0 ? { fields: refs } : 'skip',
+    enabled && locale && refs.length > 0 ? { fields: refs, targetLocale: locale } : 'skip',
   )
   const ensure = useMutation(api.translations.ensureForFields)
   const hasMissingTranslation = response?.results.some(
@@ -58,15 +60,15 @@ export function useLocalizedFields(fields: LocalizedField[]) {
   useEffect(() => {
     if (!enabled || refs.length === 0) return
     if (hasMissingTranslation) {
-      void ensure({ fields: refs }).catch(() => undefined)
+      void ensure({ fields: refs, targetLocale: locale }).catch(() => undefined)
       return
     }
     if (!nextRetryAfter) return
     const timeout = window.setTimeout(() => {
-      void ensure({ fields: refs }).catch(() => undefined)
+      void ensure({ fields: refs, targetLocale: locale }).catch(() => undefined)
     }, Math.max(0, nextRetryAfter - Date.now()) + 50)
     return () => window.clearTimeout(timeout)
-  }, [enabled, ensure, hasMissingTranslation, nextRetryAfter, refs])
+  }, [enabled, ensure, hasMissingTranslation, locale, nextRetryAfter, refs])
 
   const results = new Map(
     response?.results.map((result) => [fieldKey(result), result]),

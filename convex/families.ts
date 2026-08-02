@@ -83,11 +83,17 @@ export const get = query({
     );
     const { inviteToken, ...familyWithoutInviteToken } = family;
     const role = isOwner(family, userId) ? "owner" : membership.role;
+    const ownerProfile = await ctx.db
+      .query("userProfiles")
+      .withIndex("userId", (q) => q.eq("userId", family.ownerUserId))
+      .unique();
     return {
       ...familyWithoutInviteToken,
       // An invite token is a bearer capability: regular members must not
       // receive it merely because they can view the family.
       inviteToken: role === "user" ? null : inviteToken,
+      // The owner's profile locale is the family's implicit base language.
+      ownerLocale: ownerProfile?.locale ?? "en",
       role,
       displayName: membership.displayName,
     };

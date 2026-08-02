@@ -24,6 +24,12 @@ locale as source metadata. Imported recipe fields use the locale established by
 the import pipeline. The source locale is compared with the viewer's locale
 before any provider work is claimed.
 
+Within the active family, the family owner's profile locale is the implicit
+family language; no separate family-language field is stored. Recipe detail
+uses that locale as a secondary ingredient display target when it differs from
+the viewer's locale, placing the owner-language text below the viewer text
+once that translation is available.
+
 When enabled, a view renders the original text immediately. It then reads a
 cached translation for the viewer's current locale or requests one missing
 translation in the background. Convex reactivity replaces the displayed text
@@ -49,6 +55,8 @@ The flag is intentionally per user, not per family:
 
 - enabling one helper does not enable their employer or another helper
 - the target language comes from that same profile's `locale`
+- a family owner’s `locale` also supplies the family’s implicit language for
+  the secondary recipe-ingredient display
 - changing the locale uses a separate translation cache for the new language
 - newly invited members remain disabled until an operator enables their row
 

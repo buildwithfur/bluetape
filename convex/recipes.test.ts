@@ -51,6 +51,14 @@ function asUser<T extends ReturnType<typeof convexTest>>(t: T, userId: Id<"users
 }
 
 describe("recipe import lifecycle", () => {
+  it("derives the family language from the owner's profile locale", async () => {
+    const { t, ownerId, familyId } = await setup();
+
+    const family = await asUser(t, ownerId).query(api.families.get, { familyId });
+
+    expect(family?.ownerLocale).toBe("en");
+  });
+
   it("requeues a pre-locale draft in the importing user's locale", async () => {
     const { t, importerId, familyId } = await setup();
     const importer = asUser(t, importerId);
