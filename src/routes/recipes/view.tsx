@@ -126,8 +126,8 @@ export default function RecipeView() {
           <section key={`${section.name}:${sectionIndex}`} className="mt-8 border-t border-border-subtle pt-5">
             {section.name && <h2 className="text-[22px] font-semibold text-ink">{section.name}</h2>}
             <h3 className="label-caps mt-3 text-text-tertiary">{t('recipe.ingredients')}</h3>
-            <ul className="mt-2">
-              {section.ingredients.map((row) => {
+            <ol className="mt-2">
+              {section.ingredients.map((row, index) => {
                 const cartState = ingredientCartStates[row._id] ?? undefined
                 const cartLabel = cartState === 'adding'
                   ? t('recipe.addingToCart')
@@ -148,6 +148,7 @@ export default function RecipeView() {
 
                 return (
                   <li key={row._id} className="flex min-h-12 items-start gap-3 border-b border-border-subtle py-3 text-[16px] leading-relaxed">
+                    <span className="mono-md pt-0.5 text-text-tertiary">{index + 1}</span>
                     <div className="min-w-0 flex-1">
                       <Markdown content={translatedText} inline />
                       {showFamilyLanguage && (
@@ -170,7 +171,7 @@ export default function RecipeView() {
                   </li>
                 )
               })}
-            </ul>
+            </ol>
             <h3 className="label-caps mt-6 text-text-tertiary">{t('recipe.steps')}</h3>
             <ol className="mt-1">
             {section.steps.map((row, index) => <li key={row._id} className="grid grid-cols-[2rem_minmax(0,1fr)] gap-3 border-b border-border-subtle py-5"><span className="mono-md pt-0.5 text-text-tertiary">{index + 1}</span><Markdown content={localized.textFor({ entityType: 'recipeStep', entityId: row._id, field: 'text', source: row.text })} className="text-[17px] leading-[1.65]" /></li>)}
