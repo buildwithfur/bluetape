@@ -6,8 +6,17 @@ import { TopBar } from '@/components/AppShell'
 import { Markdown } from '@/components/Markdown'
 import { OverflowMenu } from '@/components/OverflowMenu'
 import { ShareButton } from '@/components/ShareButton'
-import { useAddGrocery, useDeleteRecipe, useRecipe } from '@/data/hooks'
+import { useAddGrocery, useCurrentFamily, useCurrentProfile, useDeleteRecipe, useRecipe } from '@/data/hooks'
 import { useLocalizedFields } from '@/data/useLocalizedFields'
+import { isSupportedLocale, type SupportedLocale } from '@/i18n'
+
+function baseLocale(locale: string | undefined) {
+  return locale?.trim().toLowerCase().split(/[-_]/)[0] ?? ''
+}
+
+function localesMatch(left: string | undefined, right: string | undefined) {
+  return Boolean(left && right) && baseLocale(left) === baseLocale(right)
+}
 
 type IngredientCartState = 'adding' | 'added' | 'error'
 
@@ -16,6 +25,11 @@ export default function RecipeView() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const data = useRecipe(id)
+  const family = useCurrentFamily()
+  const profile = useCurrentProfile()
+  const ownerLocale: SupportedLocale | undefined = family?.ownerLocale && isSupportedLocale(family.ownerLocale)
+    ? family.ownerLocale
+    : undefined
   const remove = useDeleteRecipe()
   const addGrocery = useAddGrocery()
   const [deleting, setDeleting] = useState(false)
@@ -37,17 +51,21 @@ export default function RecipeView() {
     }
   }
 
-  const localized = useLocalizedFields(
-    data && data !== undefined
-      ? [
-          { entityType: 'recipe' as const, entityId: data.recipe._id, field: 'title' as const, source: data.recipe.title },
-          ...(data.recipe.notes ? [{ entityType: 'recipe' as const, entityId: data.recipe._id, field: 'notes' as const, source: data.recipe.notes }] : []),
-          ...data.sections.flatMap((section) => [
-            ...section.ingredients.map((row) => ({ entityType: 'recipeIngredient' as const, entityId: row._id, field: 'text' as const, source: row.text })),
-            ...section.steps.map((row) => ({ entityType: 'recipeStep' as const, entityId: row._id, field: 'text' as const, source: row.text })),
-          ]),
-        ]
-      : [],
+  const localizedFields = data && data !== undefined
+    ? [
+        { entityType: 'recipe' as const, entityId: data.recipe._id, field: 'title' as const, source: data.recipe.title },
+        ...(data.recipe.notes ? [{ entityType: 'recipe' as const, entityId: data.recipe._id, field: 'notes' as const, source: data.recipe.notes }] : []),
+        ...data.sections.flatMap((section) => [
+          ...section.ingredients.map((row) => ({ entityType: 'recipeIngredient' as const, entityId: row._id, field: 'text' as const, source: row.text })),
+          ...section.steps.map((row) => ({ entityType: 'recipeStep' as const, entityId: row._id, field: 'text' as const, source: row.text })),
+        ]),
+      ]
+    : []
+  const localized = useLocalizedFields(localizedFields)
+  const ownerLanguageFields = localizedFields.filter((field) => field.entityType === 'recipeIngredient')
+  const ownerLocalized = useLocalizedFields(
+    localesMatch(ownerLocale, profile?.locale) ? [] : ownerLanguageFields,
+    ownerLocale,
   )
 
   if (data === undefined) return <><TopBar title={t('recipe.detail')} back /><p className="page-px py-10 text-sm text-text-tertiary">{t('common.loading')}</p></>
@@ -118,11 +136,25 @@ export default function RecipeView() {
                     : cartState === 'error'
                       ? t('recipe.addToCartFailed')
                       : t('recipe.addToCart')
+                const field = { entityType: 'recipeIngredient' as const, entityId: row._id, field: 'text' as const, source: row.text }
+                const translatedText = localized.textFor(field)
+                const familyLanguageText = ownerLocalized.textFor(field)
+                const viewerLanguageAvailable = localesMatch(row.sourceLocale, profile?.locale) || localized.hasTranslation(field)
+                const familyLanguageAvailable = localesMatch(row.sourceLocale, ownerLocale) || ownerLocalized.hasTranslation(field)
+                const showFamilyLanguage = !localesMatch(ownerLocale, profile?.locale) &&
+                  viewerLanguageAvailable &&
+                  familyLanguageAvailable &&
+                  translatedText !== familyLanguageText
 
                 return (
                   <li key={row._id} className="flex min-h-12 items-start gap-3 border-b border-border-subtle py-3 text-[16px] leading-relaxed">
                     <div className="min-w-0 flex-1">
-                      <Markdown content={localized.textFor({ entityType: 'recipeIngredient', entityId: row._id, field: 'text', source: row.text })} inline />
+                      <Markdown content={translatedText} inline />
+                      {showFamilyLanguage && (
+                        <div className="mt-1 text-sm leading-relaxed text-text-tertiary">
+                          <Markdown content={familyLanguageText} inline />
+                        </div>
+                      )}
                     </div>
                     <button
                       type="button"

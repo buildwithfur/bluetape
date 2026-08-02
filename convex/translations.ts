@@ -26,6 +26,10 @@ import {
   type TranslationMode,
 } from "./translation/validators";
 
+const localeValidator = v.union(
+  ...SUPPORTED_LOCALES.map((locale) => v.literal(locale)),
+);
+
 const fieldStateValidator = v.union(
   v.literal("empty"),
   v.literal("missing"),
@@ -281,7 +285,10 @@ async function findTranslation(
 }
 
 export const getForFields = query({
-  args: { fields: v.array(translationFieldRefValidator) },
+  args: {
+    fields: v.array(translationFieldRefValidator),
+    targetLocale: v.optional(localeValidator),
+  },
   returns: v.object({ enabled: v.boolean(), results: v.array(fieldResultValidator) }),
   handler: async (ctx, args) => {
     assertBoundedUniqueFields(args.fields);
@@ -289,7 +296,8 @@ export const getForFields = query({
     if (profile.autoTranslateEnabled !== true || !profile.currentFamilyId) {
       return { enabled: false, results: [] };
     }
-    assertSupportedLocale(profile.locale);
+    const targetLocale = args.targetLocale ?? profile.locale;
+    assertSupportedLocale(targetLocale);
     await requireFamilyMember(ctx, profile.currentFamilyId);
 
     const results = [];
@@ -299,12 +307,12 @@ export const getForFields = query({
         results.push({ ...ref, state: "empty" as const });
         continue;
       }
-      if (localesMatch(sourceLocale, profile.locale)) {
+      if (localesMatch(sourceLocale, targetLocale)) {
         results.push({ ...ref, state: "source_is_target" as const });
         continue;
       }
       const sourceHash = await sha256Hex(source);
-      const translation = await findTranslation(ctx, profile.currentFamilyId, ref, profile.locale);
+      const translation = await findTranslation(ctx, profile.currentFamilyId, ref, targetLocale);
       if (!translation || translation.sourceHash !== sourceHash) {
         results.push({ ...ref, state: "missing" as const });
       } else if (translation.status === "ready") {
@@ -327,13 +335,17 @@ export const getForFields = query({
 });
 
 export const ensureForFields = mutation({
-  args: { fields: v.array(translationFieldRefValidator) },
+  args: {
+    fields: v.array(translationFieldRefValidator),
+    targetLocale: v.optional(localeValidator),
+  },
   returns: v.null(),
   handler: async (ctx, args) => {
     assertBoundedUniqueFields(args.fields);
     const { profile } = await requireAuthenticatedUser(ctx);
     if (profile.autoTranslateEnabled !== true || !profile.currentFamilyId) return null;
-    assertSupportedLocale(profile.locale);
+    const targetLocale = args.targetLocale ?? profile.locale;
+    assertSupportedLocale(targetLocale);
     await requireFamilyMember(ctx, profile.currentFamilyId);
 
     const now = Date.now();
@@ -341,9 +353,9 @@ export const ensureForFields = mutation({
     for (const ref of args.fields) {
       const { source, sourceLocale } = await sourceForRef(ctx, profile.currentFamilyId, ref);
       if (!source.trim()) continue;
-      if (localesMatch(sourceLocale, profile.locale)) continue;
+      if (localesMatch(sourceLocale, targetLocale)) continue;
       const sourceHash = await sha256Hex(source);
-      const existing = await findTranslation(ctx, profile.currentFamilyId, ref, profile.locale);
+      const existing = await findTranslation(ctx, profile.currentFamilyId, ref, targetLocale);
       if (existing?.sourceHash === sourceHash &&
           (existing.status === "ready" || existing.status === "source_is_target" ||
           (existing.status === "pending" && existing.leaseExpiresAt > now) ||
@@ -359,7 +371,7 @@ export const ensureForFields = mutation({
         entityType: ref.entityType,
         entityId: ref.entityId,
         field: ref.field,
-        targetLocale: profile.locale,
+        targetLocale,
         sourceHash,
         generation,
         status: "pending" as const,

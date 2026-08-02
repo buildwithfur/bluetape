@@ -134,6 +134,29 @@ describe('translation feature gate', () => {
     expect(await t.run((ctx) => ctx.db.query('contentTranslations').collect())).toHaveLength(0)
   })
 
+  it('supports requesting a second target locale for family-language display', async () => {
+    const { t, userId, taskId } = await setupProfile({
+      enabled: true,
+      locale: 'my',
+      sourceLocale: 'id',
+    })
+    const user = asUser(t, userId)
+    const fields = [{ entityType: 'task' as const, entityId: taskId, field: 'title' as const }]
+
+    await expect(user.query(api.translations.getForFields, {
+      fields,
+      targetLocale: 'en',
+    })).resolves.toEqual({
+      enabled: true,
+      results: [{ ...fields[0], state: 'missing' }],
+    })
+    await user.mutation(api.translations.ensureForFields, { fields, targetLocale: 'en' })
+
+    const rows = await t.run((ctx) => ctx.db.query('contentTranslations').collect())
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ targetLocale: 'en', status: 'pending' })
+  })
+
   it('creates a job when the source and viewer locales differ', async () => {
     const { t, userId, taskId } = await setupProfile({
       enabled: true,
