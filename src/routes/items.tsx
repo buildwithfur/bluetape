@@ -3,10 +3,10 @@ import { Link } from 'react-router-dom'
 import { NoteBlank, Plus } from '@phosphor-icons/react'
 import { TopBar } from '@/components/AppShell'
 import { EmptyState } from '@/components/EmptyState'
-import { usePages, useStorageUrl } from '@/data/hooks'
+import { usePages } from '@/data/hooks'
 import { pagePath } from '@/lib/record-route'
-import type { Doc } from '@convex/_generated/dataModel'
 import { useLocalizedFields } from '@/data/useLocalizedFields'
+import type { PageCatalogItem } from '@/types'
 
 /** Responsive catalog of note pages — both users can create (§6.6). */
 export default function Items() {
@@ -41,8 +41,13 @@ export default function Items() {
               </span>
             </Link>
           </li>
-          {items.map((p) => (
-            <NoteCard key={p._id} note={p} title={localized.textFor({ entityType: 'page', entityId: p._id, field: 'title', source: p.title })} />
+          {items.map((p, index) => (
+            <NoteCard
+              key={p._id}
+              note={p}
+              title={localized.textFor({ entityType: 'page', entityId: p._id, field: 'title', source: p.title })}
+              eager={index < 4}
+            />
           ))}
         </ul>
       )}
@@ -50,8 +55,8 @@ export default function Items() {
   )
 }
 
-function NoteCard({ note, title }: { note: Doc<'pages'>; title: string }) {
-  const photoUrl = useStorageUrl(note.photoId)
+function NoteCard({ note, title, eager }: { note: PageCatalogItem; title: string; eager: boolean }) {
+  const photoUrl = note.photoUrl
   const initial = title.trim().charAt(0).toLocaleUpperCase() || '·'
 
   return (
@@ -64,7 +69,8 @@ function NoteCard({ note, title }: { note: Doc<'pages'>; title: string }) {
           <img
             src={photoUrl}
             alt={title}
-            loading="lazy"
+            loading={eager ? 'eager' : 'lazy'}
+            fetchPriority={eager ? 'high' : 'auto'}
             decoding="async"
             className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02] motion-reduce:transform-none"
             sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"

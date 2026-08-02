@@ -88,15 +88,48 @@ export const listByType = query({
     familyId: v.id("families"),
     type: v.union(v.literal("item"), v.literal("rule")),
   },
+  returns: v.array(
+    v.object({
+      _id: v.id("pages"),
+      _creationTime: v.number(),
+      title: v.string(),
+      slug: v.string(),
+      type: v.union(v.literal("item"), v.literal("rule")),
+      photoUrl: v.union(v.string(), v.null()),
+    }),
+  ),
   handler: async (ctx, args) => {
     await requireFamilyMember(ctx, args.familyId);
-    return ctx.db
+    const pages = await ctx.db
       .query("pages")
       .withIndex("by_type", (q) =>
         q.eq("familyId", args.familyId).eq("type", args.type),
       )
       .order("desc")
       .collect();
+
+    // Resolve the catalog image in the same query as the page metadata. This
+    // avoids one reactive files.getUrl subscription per card on the client.
+    return Promise.all(
+      pages.map(async (page) => {
+        const thumbnailUrl = page.type === "item" && page.thumbnailPhotoId
+          ? await ctx.storage.getUrl(page.thumbnailPhotoId)
+          : null;
+        const photoUrl = thumbnailUrl ?? (
+          page.type === "item" && page.photoId && page.photoId !== page.thumbnailPhotoId
+            ? await ctx.storage.getUrl(page.photoId)
+            : null
+        );
+        return {
+          _id: page._id,
+          _creationTime: page._creationTime,
+          title: page.title,
+          slug: page.slug,
+          type: page.type,
+          photoUrl,
+        };
+      }),
+    );
   },
 });
 
@@ -247,6 +280,7 @@ export const save = mutation({
     content: v.string(),
     location: v.optional(v.string()),
     photoId: v.optional(v.id("_storage")),
+    thumbnailPhotoId: v.optional(v.id("_storage")),
     pinnedToToday: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
@@ -306,6 +340,7 @@ export const save = mutation({
         location: args.location,
         locationLocale: args.location === undefined ? undefined : profile.locale,
         photoId: args.photoId,
+        thumbnailPhotoId: args.thumbnailPhotoId,
         pinnedToToday: args.pinnedToToday,
         updatedBy: userId,
         updatedAt: now,
@@ -342,6 +377,7 @@ export const save = mutation({
       location: args.location,
       locationLocale: args.location === undefined ? undefined : profile.locale,
       photoId: args.photoId,
+      thumbnailPhotoId: args.thumbnailPhotoId,
       pinnedToToday: args.pinnedToToday,
       createdBy: userId,
       updatedBy: userId,

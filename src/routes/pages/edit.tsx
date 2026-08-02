@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { TopBar } from '@/components/AppShell'
 import { Button } from '@/components/Button'
 import { EmptyState } from '@/components/EmptyState'
-import { PhotoCapture } from '@/components/PhotoCapture'
+import { PhotoCapture, type UploadedPhoto } from '@/components/PhotoCapture'
 import { WikiLinkSuggestions } from '@/components/WikiLinkSuggestions'
 import {
   usePageBySlug,
@@ -35,6 +35,7 @@ export default function PageEdit() {
   const [content, setContent] = useState('')
   const [type, setType] = useState<PageType>(() => pageTypeFromQuery(searchParams.get('type')))
   const [photoId, setPhotoId] = useState<Id<'_storage'> | undefined>(undefined)
+  const [thumbnailPhotoId, setThumbnailPhotoId] = useState<Id<'_storage'> | undefined>(undefined)
   const [pinnedToToday, setPinnedToToday] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -47,6 +48,7 @@ export default function PageEdit() {
     setContent(page.content)
     setType(page.type)
     setPhotoId(page.photoId ?? undefined)
+    setThumbnailPhotoId(page.thumbnailPhotoId ?? undefined)
     setPinnedToToday(page.pinnedToToday ?? false)
     setLoaded(true)
   }
@@ -83,6 +85,7 @@ export default function PageEdit() {
         content: type === 'item' ? content.trim() : isEdit ? page?.content ?? '' : '',
         location: isEdit && type === 'item' ? page?.location : undefined,
         photoId: type === 'item' ? photoId : undefined,
+        thumbnailPhotoId: type === 'item' ? thumbnailPhotoId : undefined,
         pinnedToToday: type === 'rule' ? pinnedToToday : undefined,
       })
       if (!saved) throw new Error(t('common.saveFailed'))
@@ -144,7 +147,10 @@ export default function PageEdit() {
               <PhotoCapture
                 storageId={photoId}
                 previewUrl={photoUrl ?? undefined}
-                onChange={setPhotoId}
+                onChange={(photo: UploadedPhoto | undefined) => {
+                  setPhotoId(photo?.storageId)
+                  setThumbnailPhotoId(photo?.thumbnailStorageId)
+                }}
                 upload={generateUploadUrl}
               />
             </div>

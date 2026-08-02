@@ -56,6 +56,9 @@ export default defineSchema({
     location: v.optional(v.string()),
     locationLocale: v.optional(v.string()),
     photoId: v.optional(v.id("_storage")),
+    // Optional derivative used by the Notes catalog. Older pages fall back to
+    // photoId until they are edited and re-uploaded.
+    thumbnailPhotoId: v.optional(v.id("_storage")),
     pinnedToToday: v.optional(v.boolean()),
     createdBy: v.id("users"),
     updatedBy: v.id("users"),

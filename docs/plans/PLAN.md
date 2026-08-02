@@ -78,7 +78,8 @@ Single source of truth: `convex/schema.ts`. All tables use Convex IDs.
   content: string,         // markdown body (English) with [[wiki links]]
   // type-specific metadata (only relevant fields populated)
   location?: string,       // items only (e.g. "Kitchen Cabinet 3")
-  photoId?: Id<"_storage">, // items only — Convex file storage ref
+  photoId?: Id<"_storage">, // items only — original Convex file storage ref
+  thumbnailPhotoId?: Id<"_storage">, // items only — resized catalog derivative; falls back to photoId
   pinnedToToday?: boolean,  // rules only — surfaces as a callout on Today
   createdBy: Id<"users">,
   updatedBy: Id<"users">,
@@ -289,7 +290,7 @@ Today's checklist                  ← label-caps, tertiary
 - Title input (label above)
 - The create route fixes the type to Note or Rule from its entry point; recipes use their own structured import/editor flow rather than the generic page editor.
 - Conditional fields based on type:
-  - **Note:** Photo with explicit Upload photo and Take photo actions (uses Convex upload URL flow). Local-language name and location are not authored in the V1 form; legacy stored values remain readable.
+  - **Note:** Photo with explicit Upload photo and Take photo actions (uses the shared `src/lib/photo-upload.ts` Convex upload flow, storing the original plus a resized catalog thumbnail). Local-language name and location are not authored in the V1 form; legacy stored values remain readable.
   - **Rule:** a `pinToToday` toggle ("Show as reminder on Today")
 - Markdown editor: a `<textarea>` with a hint banner showing `Use [[Page Name]] to link another page`. Live preview toggle.
 - Link autocomplete: typing `[[` opens a dropdown of existing page titles; selecting inserts `[[Selected Title]]`.

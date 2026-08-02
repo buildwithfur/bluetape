@@ -16,6 +16,9 @@ export interface RenderEnv {
 
 // Re-export commonly-used Convex document types for components.
 export type Page = Doc<'pages'>
+export type PageCatalogItem = Pick<Doc<'pages'>, '_id' | '_creationTime' | 'title' | 'slug' | 'type'> & {
+  photoUrl: string | null
+}
 export type Routine = Doc<'routines'>
 export type Task = Doc<'tasks'>
 export type GroceryItem = Doc<'groceryItems'>

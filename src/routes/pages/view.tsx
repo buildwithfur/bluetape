@@ -14,7 +14,7 @@ import { BottomSheet } from '@/components/BottomSheet'
 import { ShareButton } from '@/components/ShareButton'
 import { WikiLinkSuggestions } from '@/components/WikiLinkSuggestions'
 import { OverflowMenu } from '@/components/OverflowMenu'
-import { PhotoCapture } from '@/components/PhotoCapture'
+import { PhotoCapture, type UploadedPhoto } from '@/components/PhotoCapture'
 import {
   usePageBySlug,
   usePageByRecordId,
@@ -57,6 +57,7 @@ export default function PageView({ recordType }: { recordType?: PageType }) {
   const [contentDraft, setContentDraft] = useState('')
   const [saveError, setSaveError] = useState(false)
   const [photoDraft, setPhotoDraft] = useState<Id<'_storage'> | undefined>(undefined)
+  const [thumbnailPhotoDraft, setThumbnailPhotoDraft] = useState<Id<'_storage'> | undefined>(undefined)
   const [photoDirty, setPhotoDirty] = useState(false)
   const titleInputRef = useRef<HTMLInputElement>(null)
   const contentInputRef = useRef<HTMLTextAreaElement>(null)
@@ -93,8 +94,12 @@ export default function PageView({ recordType }: { recordType?: PageType }) {
   }, [editingContent])
 
   useEffect(() => {
-    if (photoDirty && page?.photoId === photoDraft) setPhotoDirty(false)
-  }, [page?.photoId, photoDirty, photoDraft])
+    if (
+      photoDirty &&
+      page?.photoId === photoDraft &&
+      page?.thumbnailPhotoId === thumbnailPhotoDraft
+    ) setPhotoDirty(false)
+  }, [page?.photoId, page?.thumbnailPhotoId, photoDirty, photoDraft, thumbnailPhotoDraft])
 
   if (page === undefined) {
     return (
@@ -121,6 +126,7 @@ export default function PageView({ recordType }: { recordType?: PageType }) {
     title?: string
     content?: string
     photoId?: Id<'_storage'>
+    thumbnailPhotoId?: Id<'_storage'>
     replacePhoto?: boolean
   }) {
     return savePage({
@@ -130,6 +136,7 @@ export default function PageView({ recordType }: { recordType?: PageType }) {
       content: next.content ?? currentPage.content,
       location: currentPage.location,
       photoId: next.replacePhoto ? next.photoId : currentPage.photoId,
+      thumbnailPhotoId: next.replacePhoto ? next.thumbnailPhotoId : currentPage.thumbnailPhotoId,
       pinnedToToday: currentPage.pinnedToToday,
     })
   }
@@ -168,12 +175,17 @@ export default function PageView({ recordType }: { recordType?: PageType }) {
     setEditingContent(false)
   }
 
-  async function savePhoto(photoId: Id<'_storage'> | undefined) {
-    setPhotoDraft(photoId)
+  async function savePhoto(photo: UploadedPhoto | undefined) {
+    setPhotoDraft(photo?.storageId)
+    setThumbnailPhotoDraft(photo?.thumbnailStorageId)
     setPhotoDirty(true)
     setSaveError(false)
     try {
-      await saveFields({ photoId, replacePhoto: true })
+      await saveFields({
+        photoId: photo?.storageId,
+        thumbnailPhotoId: photo?.thumbnailStorageId,
+        replacePhoto: true,
+      })
     } catch {
       setPhotoDirty(false)
       setSaveError(true)
