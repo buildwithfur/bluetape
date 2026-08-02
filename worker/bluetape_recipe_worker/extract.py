@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from .client import ClaimedJob, ConvexWorkerClient
 from .config import Settings
-from .security import validate_public_url
+from .security import UnsafeSourceUrl, validate_public_url
 
 
 class ExtractionError(RuntimeError):
@@ -259,6 +259,34 @@ def _safe_fetch(
             f"{type(exc).__name__}: {exc}",
         ) from exc
     raise ExtractionError("too_many_redirects", "Source redirected too many times")
+
+
+SOURCE_IMAGE_CONTENT_TYPES = frozenset({
+    "image/avif",
+    "image/gif",
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+})
+
+
+def persist_source_image(
+    settings: Settings,
+    client: ConvexWorkerClient,
+    job: ClaimedJob,
+    source_image_url: str,
+) -> str:
+    """Download a bounded thumbnail and persist it in Convex file storage."""
+    try:
+        validate_public_url(source_image_url)
+    except UnsafeSourceUrl as exc:
+        raise ExtractionError("image_unavailable", str(exc)) from exc
+    access = SourceAccess(_proxy_url_for_job(settings.dataimpulse_proxy_url, job.job_id))
+    response = access.fetch(source_image_url, max_bytes=settings.max_source_image_bytes)
+    content_type = response.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+    if content_type not in SOURCE_IMAGE_CONTENT_TYPES:
+        raise ExtractionError("image_unavailable", "Source thumbnail was not a supported raster image")
+    return client.upload_source_image(response.content, content_type)
 
 
 def _instruction_text(value: Any) -> list[str]:

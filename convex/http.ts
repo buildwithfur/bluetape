@@ -6,6 +6,14 @@ import type { Id } from "./_generated/dataModel";
 import { sha256Hex } from "./lib/sha256";
 
 const http = httpRouter();
+const MAX_RECIPE_SOURCE_IMAGE_BYTES = 8 * 1024 * 1024;
+const RECIPE_SOURCE_IMAGE_CONTENT_TYPES = new Set([
+  "image/avif",
+  "image/gif",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
 
 // Auth routes for JWT verification and OAuth callbacks
 auth.addHttpRoutes(http);
@@ -92,6 +100,34 @@ function recipeWorkerRoute(
   });
 }
 
+http.route({
+  path: "/recipe-worker/upload-image",
+  method: "POST",
+  handler: httpAction(async (ctx, req) => {
+    try {
+      authenticateRecipeWorker(req);
+      const contentType = (req.headers.get("Content-Type") ?? "")
+        .split(";", 1)[0]
+        .trim()
+        .toLowerCase();
+      if (!RECIPE_SOURCE_IMAGE_CONTENT_TYPES.has(contentType)) {
+        return jsonResponse({ error: "Recipe thumbnail must be a supported raster image" }, 415);
+      }
+      const bytes = await req.arrayBuffer();
+      if (bytes.byteLength === 0) {
+        return jsonResponse({ error: "Recipe thumbnail is empty" }, 400);
+      }
+      if (bytes.byteLength > MAX_RECIPE_SOURCE_IMAGE_BYTES) {
+        return jsonResponse({ error: "Recipe thumbnail is too large" }, 413);
+      }
+      const storageId = await ctx.storage.store(new Blob([bytes], { type: contentType }));
+      return jsonResponse({ storageId });
+    } catch (error: any) {
+      return jsonResponse({ error: error.message || "Internal error" }, error.status || 500);
+    }
+  }),
+});
+
 recipeWorkerRoute("/recipe-worker/claim", async (ctx, body) =>
   ctx.runMutation(internal.recipes.claimNext, { workerId: String(body.workerId || "worker") }));
 
@@ -112,6 +148,7 @@ recipeWorkerRoute("/recipe-worker/complete", async (ctx, body) =>
     steps: body.steps,
     sourceName: body.sourceName,
     sourceImageUrl: body.sourceImageUrl,
+    sourceImageStorageId: body.sourceImageStorageId,
     sourceLanguage: body.sourceLanguage,
   }));
 

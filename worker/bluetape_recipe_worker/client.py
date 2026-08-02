@@ -59,6 +59,21 @@ class ConvexWorkerClient:
             **recipe,
         })
 
+    def upload_source_image(self, content: bytes, content_type: str) -> str:
+        response = self._client.post(
+            f"{self._base}/recipe-worker/upload-image",
+            content=content,
+            headers={"Content-Type": content_type},
+        )
+        response.raise_for_status()
+        data = response.json()
+        if isinstance(data, dict) and data.get("error"):
+            raise RuntimeError(str(data["error"]))
+        storage_id = data.get("storageId") if isinstance(data, dict) else None
+        if not isinstance(storage_id, str) or not storage_id:
+            raise RuntimeError("Convex did not return a recipe image storage ID")
+        return storage_id
+
     def fail(self, job: ClaimedJob, error_code: str, message: str) -> None:
         self._post("/recipe-worker/fail", {
             "jobId": job.job_id,

@@ -68,6 +68,25 @@ def test_extracts_absolute_source_page_image() -> None:
     )
 
 
+def test_persists_source_image_in_convex_storage(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = FakeClient()
+    response = SimpleNamespace(
+        headers={"content-type": "image/jpeg; charset=binary"},
+        content=b"jpeg-bytes",
+    )
+    monkeypatch.setattr(extract.SourceAccess, "fetch", lambda *_args, **_kwargs: response)
+
+    storage_id = extract.persist_source_image(
+        social_settings(),
+        client,
+        social_job(),
+        "https://example.com/thumbnail.jpg",
+    )
+
+    assert storage_id == "storage-image-123"
+    assert client.uploaded_image == (b"jpeg-bytes", "image/jpeg")
+
+
 def test_rejects_non_http_source_page_image() -> None:
     html = '<meta property="og:image" content="data:image/png;base64,abc">'
 
@@ -83,9 +102,14 @@ def test_rejects_non_public_sources(url: str) -> None:
 class FakeClient:
     def __init__(self) -> None:
         self.stages: list[str] = []
+        self.uploaded_image: tuple[bytes, str] | None = None
 
     def stage(self, _job: ClaimedJob, stage: str) -> None:
         self.stages.append(stage)
+
+    def upload_source_image(self, content: bytes, content_type: str) -> str:
+        self.uploaded_image = (content, content_type)
+        return "storage-image-123"
 
 
 def social_job() -> ClaimedJob:
@@ -104,6 +128,7 @@ def social_settings() -> SimpleNamespace:
         dataimpulse_proxy_url=None,
         max_video_seconds=1800,
         max_download_bytes=10_000_000,
+        max_source_image_bytes=2_000_000,
         max_visual_frames=8,
     )
 

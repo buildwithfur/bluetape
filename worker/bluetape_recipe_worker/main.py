@@ -5,9 +5,11 @@ import tempfile
 import time
 from pathlib import Path
 
+import httpx
+
 from .client import ConvexWorkerClient
 from .config import Settings
-from .extract import ExtractionError, extract_job
+from .extract import ExtractionError, extract_job, persist_source_image
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -34,7 +36,20 @@ def run() -> None:
             try:
                 with tempfile.TemporaryDirectory(prefix="bluetape-recipe-") as directory:
                     result = extract_job(settings, client, job, Path(directory))
-                client.complete(job, result.model_dump(exclude_none=True))
+                    payload = result.model_dump(exclude_none=True)
+                    source_image_url = payload.pop("sourceImageUrl", None)
+                    if source_image_url:
+                        try:
+                            payload["sourceImageStorageId"] = persist_source_image(
+                                settings, client, job, source_image_url
+                            )
+                        except (ExtractionError, RuntimeError, httpx.HTTPError) as exc:
+                            logger.warning(
+                                "source_image_rehost_failed job_id=%s detail=%s",
+                                job.job_id,
+                                str(exc),
+                            )
+                client.complete(job, payload)
                 logger.info("job_ready_for_review job_id=%s", job.job_id)
             except ExtractionError as exc:
                 logger.warning(

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { ArrowRight, CookingPot } from '@phosphor-icons/react'
 import { useTranslation } from 'react-i18next'
@@ -121,6 +121,10 @@ function RecipeCard({ recipe, title }: { recipe: Doc<'recipes'>; title: string }
   const [imageFailed, setImageFailed] = useState(false)
   const initial = title.trim().charAt(0).toLocaleUpperCase() || '·'
   const imageUrl = imageFailed ? null : recipe.sourceImageUrl
+
+  useEffect(() => {
+    setImageFailed(false)
+  }, [recipe.sourceImageUrl])
 
   return (
     <li className="min-w-0">

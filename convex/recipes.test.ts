@@ -126,6 +126,42 @@ describe("recipe import lifecycle", () => {
     expect(detail?.steps.map((row) => row.text)).toEqual(["Poach the chicken.", "Cook the rice."]);
   });
 
+  it("resolves durable thumbnail storage and removes it with the recipe", async () => {
+    const { t, importerId, familyId } = await setup();
+    const importer = asUser(t, importerId);
+    const created = await importer.mutation(api.recipes.createImport, {
+      familyId,
+      url: "https://example.com/thumbnail-recipe",
+    });
+    if (!created.jobId) throw new Error("Expected import job");
+    const claim = await t.mutation(internal.recipes.claimNext, { workerId: "test-worker" });
+    if (!claim) throw new Error("Expected claimed job");
+    const storageId = await t.run(async (ctx) =>
+      ctx.storage.store(new Blob(["thumbnail"], { type: "image/jpeg" })));
+
+    await t.mutation(internal.recipes.completeWorkerDraft, {
+      jobId: claim.jobId,
+      leaseToken: claim.leaseToken,
+      title: "Thumbnail recipe",
+      ingredients: ["Water"],
+      steps: ["Boil it."],
+      sourceImageStorageId: storageId,
+    });
+    const recipeId = await importer.mutation(api.recipes.publish, {
+      jobId: created.jobId,
+      title: "Thumbnail recipe",
+      ingredients: ["Water"],
+      steps: ["Boil it."],
+    });
+
+    const detail = await importer.query(api.recipes.get, { recipeId });
+    expect(detail?.recipe.sourceImageStorageId).toBe(storageId);
+    expect(detail?.recipe.sourceImageUrl).toContain("/api/storage/");
+
+    await importer.mutation(api.recipes.remove, { recipeId });
+    expect(await t.run((ctx) => ctx.db.system.get("_storage", storageId))).toBeNull();
+  });
+
   it("preserves named recipe components for multi-part recipes", async () => {
     const { t, importerId, familyId } = await setup();
     const importer = asUser(t, importerId);

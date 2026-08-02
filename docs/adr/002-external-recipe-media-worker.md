@@ -55,10 +55,11 @@ Cloudflare Containers is the preferred consolidation option if keeping all non-C
 - Invoke binaries with an argument array and `shell: false`; never interpolate a user URL into a shell command.
 - Use one isolated temporary directory per job and remove it in a `finally` path.
 - Cap source duration, download bytes, HTML bytes, redirects, execution time, and transcript length.
+- Rehost a bounded raster source thumbnail into Convex file storage when one is available; store only its `Id<"_storage">` on the recipe so provider-signed image URLs cannot expire. The thumbnail is deleted with the recipe.
 - Start at concurrency one per worker; increase only after observing CPU, memory, platform throttling, and transcription costs.
 - Authenticate worker endpoints with a rotatable secret and constant-time verification. Never expose the worker secret to the browser.
 - Pin image dependencies for reproducible deploys, rebuild frequently, and run smoke fixtures against all supported platforms because extractors break when source sites change.
-- Preserve only the source metadata, transcript/extraction evidence needed for retry/debugging, and the final recipe. Do not retain downloaded media by default.
+- Preserve only the source metadata, transcript/extraction evidence needed for retry/debugging, the final recipe, and its small rehosted thumbnail. Downloaded audio, video, frames, and other working media remain temporary and are not retained.
 
 ## Consequences
 

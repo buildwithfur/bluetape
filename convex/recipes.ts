@@ -94,6 +94,21 @@ function canManage(
     access.membership.role === "admin" || isOwner(access.family, access.userId);
 }
 
+async function withSourceImageUrl(
+  ctx: QueryCtx,
+  recipe: Doc<"recipes">,
+) {
+  const storedImageUrl = recipe.sourceImageStorageId
+    ? await ctx.storage.getUrl(recipe.sourceImageStorageId)
+    : null;
+  return {
+    ...recipe,
+    // Keep the old provider URL as a read fallback for legacy rows. New rows
+    // clear it after the worker has uploaded the thumbnail to Convex storage.
+    sourceImageUrl: storedImageUrl ?? recipe.sourceImageUrl,
+  };
+}
+
 function cleanTitle(value: string): string {
   const title = value.trim();
   if (!title) throw new Error("Recipe title is required");
@@ -206,11 +221,12 @@ export const list = query({
   args: { familyId: v.id("families") },
   handler: async (ctx, args) => {
     await requireFamilyMember(ctx, args.familyId);
-    return ctx.db.query("recipes")
+    const recipes = await ctx.db.query("recipes")
       .withIndex("by_family_and_status_and_updated_at", (q) =>
         q.eq("familyId", args.familyId).eq("status", "published"))
       .order("desc")
       .take(100);
+    return Promise.all(recipes.map((recipe) => withSourceImageUrl(ctx, recipe)));
   },
 });
 
@@ -236,7 +252,11 @@ export const get = query({
     const access = await requireFamilyMember(ctx, recipe.familyId);
     if (recipe.status !== "published" && !canManage(recipe, access)) return null;
     const children = await childrenFor(ctx, recipe._id);
-    return { recipe, ...children, canManage: canManage(recipe, access) };
+    return {
+      recipe: await withSourceImageUrl(ctx, recipe),
+      ...children,
+      canManage: canManage(recipe, access),
+    };
   },
 });
 
@@ -251,7 +271,7 @@ export const getImport = query({
     const recipe = await ctx.db.get(job.recipeId);
     if (!recipe || !canManage(recipe, access)) return null;
     const children = await childrenFor(ctx, recipe._id);
-    return { job, recipe, ...children };
+    return { job, recipe: await withSourceImageUrl(ctx, recipe), ...children };
   },
 });
 
@@ -373,6 +393,9 @@ export const discardImport = mutation({
       await deleteTranslationsFor(ctx, recipe.familyId, "recipeStep", step._id);
       await ctx.db.delete(step._id);
     }
+    if (recipe.sourceImageStorageId) {
+      await ctx.storage.delete(recipe.sourceImageStorageId);
+    }
     await ctx.db.delete(job._id);
     await ctx.db.delete(recipe._id);
     return null;
@@ -481,6 +504,9 @@ export const remove = mutation({
       await deleteTranslationsFor(ctx, recipe.familyId, "recipeStep", step._id);
       await ctx.db.delete(step._id);
     }
+    if (recipe.sourceImageStorageId) {
+      await ctx.storage.delete(recipe.sourceImageStorageId);
+    }
     const job = await findJobForRecipe(ctx, recipe);
     if (job) await ctx.db.delete(job._id);
     await ctx.db.delete(recipe._id);
@@ -550,7 +576,8 @@ export const completeWorkerDraft = internalMutation({
   args: {
     jobId: v.id("recipeImportJobs"), leaseToken: v.string(), title: v.string(),
     sections: v.optional(v.array(recipeSectionValidator)), ingredients: v.optional(v.array(v.string())), steps: v.optional(v.array(v.string())),
-    sourceName: v.optional(v.string()), sourceImageUrl: v.optional(v.string()), sourceLanguage: v.optional(v.string()),
+    sourceName: v.optional(v.string()), sourceImageUrl: v.optional(v.string()),
+    sourceImageStorageId: v.optional(v.id("_storage")), sourceLanguage: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const job = await ctx.db.get(args.jobId);
@@ -564,10 +591,27 @@ export const completeWorkerDraft = internalMutation({
     await replaceChildren(ctx, recipe, sections, job.targetLocale ?? "en");
     const ingredients = sections.flatMap((section) => section.ingredients);
     const steps = sections.flatMap((section) => section.steps);
+    if (args.sourceImageStorageId) {
+      const metadata = await ctx.db.system.get("_storage", args.sourceImageStorageId);
+      if (!metadata) throw new Error("Recipe image not found in storage");
+    }
+    const sourceImageUrl = args.sourceImageUrl?.trim() || undefined;
+    const imagePatch = args.sourceImageStorageId
+      ? { sourceImageStorageId: args.sourceImageStorageId, sourceImageUrl: undefined }
+      : sourceImageUrl
+        ? { sourceImageStorageId: undefined, sourceImageUrl }
+        : {};
+    if (
+      recipe.sourceImageStorageId &&
+      recipe.sourceImageStorageId !== args.sourceImageStorageId &&
+      (args.sourceImageStorageId || sourceImageUrl)
+    ) {
+      await ctx.storage.delete(recipe.sourceImageStorageId);
+    }
     const now = Date.now();
     await ctx.db.patch(recipe._id, {
       title, titleLocale: args.sourceLanguage?.trim() || undefined,
-      sourceName: args.sourceName?.trim() || undefined, sourceImageUrl: args.sourceImageUrl?.trim() || undefined,
+      sourceName: args.sourceName?.trim() || undefined, ...imagePatch,
       sourceLanguage: args.sourceLanguage?.trim() || undefined, searchText: `${title}\n${ingredients.join("\n")}`.toLowerCase(),
       ingredientCount: ingredients.length, stepCount: steps.length, updatedAt: now,
     });

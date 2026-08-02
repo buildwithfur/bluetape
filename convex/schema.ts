@@ -138,7 +138,10 @@ export default defineSchema({
     ),
     sourceDomain: v.string(),
     sourceName: v.optional(v.string()),
+    // Legacy imports may still have a provider URL; new imports use durable
+    // Convex storage so signed CDN URLs cannot expire underneath the card.
     sourceImageUrl: v.optional(v.string()),
+    sourceImageStorageId: v.optional(v.id("_storage")),
     /** Language detected in the external recipe evidence before import translation. */
     sourceLanguage: v.optional(v.string()),
     /** Optional free-form serving, storage, and substitution notes. */

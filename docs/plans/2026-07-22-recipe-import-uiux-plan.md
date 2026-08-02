@@ -274,7 +274,7 @@ The UI contract should provide:
 - `sourceUrl`
 - `sourceType: "tiktok" | "instagram" | "youtube" | "website"`
 - optional `sourceName` / creator name
-- optional `sourceImageUrl` or stored image reference
+- optional stored source thumbnail reference (the UI receives a resolved `sourceImageUrl`)
 - `importStatus` and current `importStage`
 - `createdBy`, `createdAt`, and `updatedAt`
 - optional `reviewedAt`
@@ -284,6 +284,8 @@ The raw caption, description, transcript, schema payload, and extraction diagnos
 ## 8. Backend execution
 
 Convex owns authentication, family permissions, `recipeImportJobs`, recipe records, retry/lease state, and realtime progress. A separate Docker media worker claims queued jobs from authenticated Convex HTTP endpoints and performs source extraction, transcription, and structured LLM parsing.
+
+When extraction provides a thumbnail, the worker downloads it within a strict size/type limit and uploads it to Convex file storage. Recipes store the storage ID rather than a provider-signed URL; read queries resolve a fresh storage URL for the UI, and recipe deletion removes the stored thumbnail.
 
 The accepted MVP deployment is a long-lived Railway worker in the dedicated **bluetape** project (`8f3dbd79-5e5a-414e-b6f4-38b9b12a0c5b`) under the Indiego Lab workspace, built from the same Dockerfile used locally. Its base toolchain is Python 3.12, `yt-dlp[default]`, `gallery-dl`, `ffmpeg`/`ffprobe`, and Deno. Post-level caption metadata is always assessed first; `gallery-dl` runs only for an Instagram carousel whose text evidence is incomplete. Login-gated sources show an explicit access failure and can be cleared by the importer. See `docs/adr/002-external-recipe-media-worker.md` for the lifecycle, deployment tradeoff, and security constraints.
 

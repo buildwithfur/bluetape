@@ -12,4 +12,4 @@ Copy `.env.example` to `.env`, set the same `RECIPE_WORKER_SECRET` in Convex and
 docker compose -f docker-compose.recipe.yml up --build
 ```
 
-Downloaded media and sampled frames live only in a per-job temporary directory and are removed after each attempt.
+Downloaded audio, video, sampled frames, and other working media live only in a per-job temporary directory and are removed after each attempt. A source thumbnail, when available and no larger than `MAX_SOURCE_IMAGE_BYTES` (default 8 MiB), is uploaded to Convex file storage so recipe cards do not depend on expiring provider URLs.
