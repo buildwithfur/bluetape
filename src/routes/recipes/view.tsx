@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowSquareOut, PencilSimple, Trash } from '@phosphor-icons/react'
+import { ArrowSquareOut, Check, PencilSimple, ShoppingCart, Trash } from '@phosphor-icons/react'
 import { useTranslation } from 'react-i18next'
 import { TopBar } from '@/components/AppShell'
 import { Markdown } from '@/components/Markdown'
 import { OverflowMenu } from '@/components/OverflowMenu'
 import { ShareButton } from '@/components/ShareButton'
-import { useDeleteRecipe, useRecipe } from '@/data/hooks'
+import { useAddGrocery, useDeleteRecipe, useRecipe } from '@/data/hooks'
 import { useLocalizedFields } from '@/data/useLocalizedFields'
+
+type IngredientCartState = 'adding' | 'added' | 'error'
 
 export default function RecipeView() {
   const { id } = useParams()
@@ -15,7 +17,26 @@ export default function RecipeView() {
   const navigate = useNavigate()
   const data = useRecipe(id)
   const remove = useDeleteRecipe()
+  const addGrocery = useAddGrocery()
   const [deleting, setDeleting] = useState(false)
+  const [ingredientCartStates, setIngredientCartStates] = useState<Record<string, IngredientCartState>>({})
+
+  async function addIngredientToCart(ingredientId: string, ingredientText: string) {
+    const currentState = ingredientCartStates[ingredientId]
+    if (currentState === 'adding' || currentState === 'added') return
+
+    setIngredientCartStates((current) => ({ ...current, [ingredientId]: 'adding' }))
+    try {
+      // Add the source text so canonical [[wiki links]] remain intact. The
+      // visible translation is for reading only; groceryItems.add records the
+      // viewer's locale for the newly authored shopping row.
+      await addGrocery(ingredientText)
+      setIngredientCartStates((current) => ({ ...current, [ingredientId]: 'added' }))
+    } catch {
+      setIngredientCartStates((current) => ({ ...current, [ingredientId]: 'error' }))
+    }
+  }
+
   const localized = useLocalizedFields(
     data && data !== undefined
       ? [
@@ -88,7 +109,35 @@ export default function RecipeView() {
             {section.name && <h2 className="text-[22px] font-semibold text-ink">{section.name}</h2>}
             <h3 className="label-caps mt-3 text-text-tertiary">{t('recipe.ingredients')}</h3>
             <ul className="mt-2">
-              {section.ingredients.map((row) => <li key={row._id} className="min-h-12 border-b border-border-subtle py-3 text-[16px] leading-relaxed"><Markdown content={localized.textFor({ entityType: 'recipeIngredient', entityId: row._id, field: 'text', source: row.text })} inline /></li>)}
+              {section.ingredients.map((row) => {
+                const cartState = ingredientCartStates[row._id] ?? undefined
+                const cartLabel = cartState === 'adding'
+                  ? t('recipe.addingToCart')
+                  : cartState === 'added'
+                    ? t('recipe.addedToCart')
+                    : cartState === 'error'
+                      ? t('recipe.addToCartFailed')
+                      : t('recipe.addToCart')
+
+                return (
+                  <li key={row._id} className="flex min-h-12 items-start gap-3 border-b border-border-subtle py-3 text-[16px] leading-relaxed">
+                    <div className="min-w-0 flex-1">
+                      <Markdown content={localized.textFor({ entityType: 'recipeIngredient', entityId: row._id, field: 'text', source: row.text })} inline />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void addIngredientToCart(row._id, row.text)}
+                      disabled={cartState === 'adding' || cartState === 'added'}
+                      aria-label={cartLabel}
+                      aria-busy={cartState === 'adding'}
+                      className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xs px-2 text-sm text-ink-700 transition hover:bg-surface-hover active:bg-surface-active disabled:text-text-tertiary"
+                    >
+                      {cartState === 'added' ? <Check size={17} weight="bold" aria-hidden="true" /> : <ShoppingCart size={18} aria-hidden="true" />}
+                      <span className="whitespace-nowrap">{cartLabel}</span>
+                    </button>
+                  </li>
+                )
+              })}
             </ul>
             <h3 className="label-caps mt-6 text-text-tertiary">{t('recipe.steps')}</h3>
             <ol className="mt-1">
