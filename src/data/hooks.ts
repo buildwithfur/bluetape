@@ -12,7 +12,7 @@ import { api } from '@convex/_generated/api'
 import type { Doc, Id } from '@convex/_generated/dataModel'
 import { todayInSG } from '@/lib/date'
 import { useCurrentSGDate } from '@/hooks/useCurrentSGDate'
-import type { PageType, Frequency } from '@/types'
+import type { PageCatalogItem, PageType, Frequency } from '@/types'
 
 export type { Doc, Id }
 
@@ -162,7 +162,7 @@ export function useUpcomingTasks(afterDate: string) {
 }
 
 // ─── Pages ──────────────────────────────────────────────────────────────
-export function usePages(type: PageType) {
+export function usePages(type: PageType): PageCatalogItem[] | undefined {
   const familyId = useCurrentFamilyId()
   return useQuery(api.pages.listByType, familyId ? { familyId, type } : 'skip')
 }
@@ -283,13 +283,16 @@ export function useGroceryItem(itemId: string | undefined) {
  * Keep the small set of primary family views subscribed while the app shell is
  * mounted. Convex releases route-local subscriptions on unmount, so this
  * prevents a tab switch from briefly returning `undefined` and flashing a
- * loading state. All calls are deduplicated with the matching route hooks.
+ * loading state. The Notes catalog is included so its thumbnail URLs are
+ * already resolved when the route mounts. All calls are deduplicated with the
+ * matching route hooks.
  */
 export function useNavigationWarmup() {
   const today = todayInSG()
 
   useToday(today, true)
   useRoutines()
+  usePages('item')
   useRecipes()
   useShopping()
 }
@@ -491,6 +494,7 @@ export function useSavePage() {
     content: string
     location?: string
     photoId?: Id<'_storage'>
+    thumbnailPhotoId?: Id<'_storage'>
     pinnedToToday?: boolean
   }) => {
     if (!familyId) throw new Error('No active family')

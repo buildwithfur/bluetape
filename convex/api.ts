@@ -269,6 +269,7 @@ export const savePage = internalMutation({
     content: v.string(),
     location: v.optional(v.string()),
     photoId: v.optional(v.id("_storage")),
+    thumbnailPhotoId: v.optional(v.id("_storage")),
     pinnedToToday: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
@@ -305,6 +306,7 @@ export const savePage = internalMutation({
         location: args.location,
         locationLocale: args.location === undefined ? undefined : "en",
         photoId: args.photoId,
+        thumbnailPhotoId: args.thumbnailPhotoId,
         pinnedToToday: args.pinnedToToday,
         updatedBy: userId,
         updatedAt: now,
@@ -340,6 +342,7 @@ export const savePage = internalMutation({
       location: args.location,
       locationLocale: args.location === undefined ? undefined : "en",
       photoId: args.photoId,
+      thumbnailPhotoId: args.thumbnailPhotoId,
       pinnedToToday: args.pinnedToToday,
       createdBy: userId,
       updatedBy: userId,

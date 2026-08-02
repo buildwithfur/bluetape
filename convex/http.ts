@@ -423,6 +423,8 @@ async function handlePost(
         type: body.type,
         content: body.content || "",
         location: body.location,
+        photoId: body.photoId,
+        thumbnailPhotoId: body.thumbnailPhotoId,
         pinnedToToday: body.pinnedToToday,
       });
       return jsonResponse(result, body.pageId ? 200 : 201);

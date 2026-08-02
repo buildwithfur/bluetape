@@ -3,11 +3,15 @@ import { useTranslation } from 'react-i18next'
 import { Camera, UploadSimple, X, Spinner } from '@phosphor-icons/react'
 import { cn } from '@/lib/cn'
 import type { Id } from '@convex/_generated/dataModel'
+import { uploadPhotoWithThumbnail, type GenerateUploadUrl, type UploadedPhoto } from '@/lib/photo-upload'
+
+export type { UploadedPhoto } from '@/lib/photo-upload'
 
 /** Photo capture for the item editor.
  * Convex 3-step upload flow (PLAN.md §1 quickstart): generateUploadUrl →
- * POST the file → save the returned storageId. The editor passes `previewUrl`
- * (resolved from `useStorageUrl`) when editing an existing item.
+ * POST the original and its catalog thumbnail → save both storageIds. The
+ * editor passes `previewUrl` (resolved from `useStorageUrl`) when editing an
+ * existing item.
  */
 export function PhotoCapture({
   storageId,
@@ -17,8 +21,8 @@ export function PhotoCapture({
 }: {
   storageId?: Id<'_storage'>
   previewUrl?: string | null
-  onChange: (storageId: Id<'_storage'> | undefined) => void | Promise<void>
-  upload: () => Promise<string> // returns upload url
+  onChange: (photo: UploadedPhoto | undefined) => void | Promise<void>
+  upload: GenerateUploadUrl
 }) {
   const { t } = useTranslation()
   const uploadInputRef = useRef<HTMLInputElement>(null)
@@ -32,15 +36,8 @@ export function PhotoCapture({
     setBusy(true)
     setError(null)
     try {
-      const postUrl = await upload()
-      const res = await fetch(postUrl, {
-        method: 'POST',
-        headers: file.type ? { 'Content-Type': file.type } : undefined,
-        body: file,
-      })
-      if (!res.ok) throw new Error(t('page.photo.uploadFailed'))
-      const { storageId: sid } = (await res.json()) as { storageId: Id<'_storage'> }
-      onChange(sid)
+      const photo = await uploadPhotoWithThumbnail(file, upload, t('page.photo.uploadFailed'))
+      await onChange(photo)
     } catch (err) {
       setError(err instanceof Error ? err.message : t('page.photo.uploadFailed'))
     } finally {
@@ -55,7 +52,7 @@ export function PhotoCapture({
           <img src={src} alt={t('page.photo.alt')} className="w-full h-full object-cover" />
           <button
             type="button"
-            onClick={() => onChange(undefined)}
+            onClick={() => void onChange(undefined)}
             aria-label={t('page.photo.remove')}
             className="absolute top-2 right-2 h-9 w-9 inline-flex items-center justify-center rounded-full bg-surface-floating/90 text-ink-700 backdrop-blur-sm ring-1 ring-border-subtle active:scale-95 transition"
           >
