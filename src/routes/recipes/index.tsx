@@ -105,7 +105,7 @@ export default function RecipesIndex() {
               <p className="mx-auto mt-3 max-w-64 text-sm leading-relaxed text-text-secondary">{t('recipe.empty')}</p>
             </div>
           ) : (
-            <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+            <ul className="-mx-2 mt-3 grid grid-cols-2 gap-x-2.5 gap-y-5 sm:mx-0 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-4">
               {recipes.map((recipe) => (
                 <RecipeCard key={recipe._id} recipe={recipe} title={localized.textFor({ entityType: 'recipe', entityId: recipe._id, field: 'title', source: recipe.title })} />
               ))}
@@ -124,34 +124,29 @@ function RecipeCard({ recipe, title }: { recipe: Doc<'recipes'>; title: string }
 
   return (
     <li className="min-w-0">
-      <Link
-        to={`/recipes/${recipe._id}`}
-        className="group relative block aspect-[4/3] h-full overflow-hidden rounded-sm bg-background-alt shadow-[0_1px_0_rgba(10,41,80,0.08)] ring-1 ring-border-subtle transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(10,41,80,0.08)] active:translate-y-0 motion-reduce:transform-none"
-      >
-        {imageUrl ? (
-          <img
-            src={imageUrl}
-            alt={title}
-            loading="lazy"
-            decoding="async"
-            referrerPolicy="no-referrer"
-            onError={() => setImageFailed(true)}
-            className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02] motion-reduce:transform-none"
-            sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
-          />
-        ) : (
-          <div className="relative flex h-full items-center justify-center overflow-hidden bg-[linear-gradient(145deg,var(--color-surface)_0%,var(--color-background-alt)_100%)]">
-            <span aria-hidden="true" className="select-none text-[64px] font-semibold tracking-[-0.05em] text-ink/[0.08]">
-              {initial}
-            </span>
-            <CookingPot size={18} aria-hidden="true" className="absolute right-3 top-3 text-text-disabled" />
-          </div>
-        )}
-        <div className="absolute inset-x-2 bottom-2 min-w-0 rounded-xs border border-white/60 bg-surface-floating/90 px-3 py-2 text-ink shadow-[0_2px_10px_rgba(10,41,80,0.08)] backdrop-blur-md">
-          <div className="line-clamp-2 text-[15px] font-semibold leading-snug tracking-[-0.01em]">
-            {title}
-          </div>
+      <Link to={`/recipes/${recipe._id}`} className="group block min-w-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+        <div className="aspect-[4/3] overflow-hidden bg-background-alt shadow-[0_1px_0_rgba(10,41,80,0.08)] ring-1 ring-border-subtle transition-[transform,box-shadow] duration-200 group-hover:-translate-y-0.5 group-hover:shadow-[0_8px_24px_rgba(10,41,80,0.08)] group-active:translate-y-0 motion-reduce:transform-none">
+          {imageUrl ? (
+            <img
+              src={imageUrl}
+              alt={title}
+              loading="lazy"
+              decoding="async"
+              referrerPolicy="no-referrer"
+              onError={() => setImageFailed(true)}
+              className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02] motion-reduce:transform-none"
+              sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+            />
+          ) : (
+            <div className="relative flex h-full items-center justify-center overflow-hidden bg-[linear-gradient(145deg,var(--color-surface)_0%,var(--color-background-alt)_100%)]">
+              <span aria-hidden="true" className="select-none text-[64px] font-semibold tracking-[-0.05em] text-ink/[0.08]">
+                {initial}
+              </span>
+              <CookingPot size={18} aria-hidden="true" className="absolute right-3 top-3 text-text-disabled" />
+            </div>
+          )}
         </div>
+        <div className="mt-1.5 line-clamp-2 text-center text-sm font-normal leading-[1.25] text-ink">{title}</div>
       </Link>
     </li>
   )
