@@ -113,13 +113,6 @@ export default function RecipeView() {
         <header>
           <h1 className="max-w-[22ch] text-[32px] font-semibold leading-[1.08] tracking-[-0.025em] text-ink">{title}</h1>
           <p className="mt-3 mono-sm text-text-tertiary">{t('recipe.meta', { ingredients: recipe.ingredientCount, steps: recipe.stepCount })}</p>
-          <div className="mt-4 flex min-h-11 items-center justify-between gap-3 border-y border-border-subtle py-2">
-            <span className="min-w-0 truncate text-sm text-text-secondary">{t(`recipe.sourceType.${recipe.sourceType}`)}{recipe.sourceName ? ` · ${recipe.sourceName}` : ` · ${recipe.sourceDomain}`}</span>
-            <a href={recipe.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xs px-2 text-sm font-medium text-ink-700 underline underline-offset-2">
-              {t('recipe.openSource')} <ArrowSquareOut size={16} aria-hidden="true" />
-            </a>
-          </div>
-          {!recipe.manuallyEditedAt && <p className="mt-3 text-sm leading-relaxed text-warning-text">{t('recipe.importedNotice')}</p>}
         </header>
 
         {data.sections.map((section, sectionIndex) => (
@@ -186,6 +179,15 @@ export default function RecipeView() {
           </section>
         ))}
         {recipe.notes && <section className="mt-9 border-t border-border-subtle pt-5"><h2 className="label-caps text-text-tertiary">{t('record.note')}</h2><Markdown content={localized.textFor({ entityType: 'recipe', entityId: recipe._id, field: 'notes', source: recipe.notes })} className="mt-2 text-[17px] leading-[1.65]" /></section>}
+        <section className="mt-9 border-t border-border-subtle pt-5">
+          <h2 className="label-caps text-text-tertiary">{t('recipe.source')}</h2>
+          <div className="mt-3 flex min-h-11 items-center justify-between gap-3 border-y border-border-subtle py-2">
+            <span className="min-w-0 truncate text-sm text-text-secondary">{t(`recipe.sourceType.${recipe.sourceType}`)}{recipe.sourceName ? ` · ${recipe.sourceName}` : ` · ${recipe.sourceDomain}`}</span>
+            <a href={recipe.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xs px-2 text-sm font-medium text-ink-700 underline underline-offset-2">
+              {t('recipe.openSource')} <ArrowSquareOut size={16} aria-hidden="true" />
+            </a>
+          </div>
+        </section>
       </article>
     </>
   )

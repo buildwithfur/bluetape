@@ -311,7 +311,6 @@
   "recipe.steps": "Langkah",
   "recipe.source": "Sumber",
   "recipe.openSource": "Buka sumber",
-  "recipe.importedNotice": "Resep hasil impor — periksa dengan sumber asli.",
   "recipe.confirmDelete": "Hapus resep ini? Tindakan ini tidak dapat dibatalkan.",
   "recipe.field.title": "Judul",
   "recipe.ingredientNumber": "Bahan {{number}}",
