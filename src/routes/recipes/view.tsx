@@ -87,9 +87,14 @@ export default function RecipeView() {
           <section key={`${section.name}:${sectionIndex}`} className="mt-8 border-t border-border-subtle pt-5">
             {section.name && <h2 className="text-[22px] font-semibold text-ink">{section.name}</h2>}
             <h3 className="label-caps mt-3 text-text-tertiary">{t('recipe.ingredients')}</h3>
-            <ul className="mt-2">
-              {section.ingredients.map((row) => <li key={row._id} className="min-h-12 border-b border-border-subtle py-3 text-[16px] leading-relaxed"><Markdown content={localized.textFor({ entityType: 'recipeIngredient', entityId: row._id, field: 'text', source: row.text })} inline /></li>)}
-            </ul>
+            <ol className="mt-2">
+              {section.ingredients.map((row, index) => (
+                <li key={row._id} className="grid min-h-12 grid-cols-[2rem_minmax(0,1fr)] gap-3 border-b border-border-subtle py-3 text-[16px] leading-relaxed">
+                  <span className="mono-md pt-0.5 text-text-tertiary">{index + 1}</span>
+                  <Markdown content={localized.textFor({ entityType: 'recipeIngredient', entityId: row._id, field: 'text', source: row.text })} inline />
+                </li>
+              ))}
+            </ol>
             <h3 className="label-caps mt-6 text-text-tertiary">{t('recipe.steps')}</h3>
             <ol className="mt-1">
             {section.steps.map((row, index) => <li key={row._id} className="grid grid-cols-[2rem_minmax(0,1fr)] gap-3 border-b border-border-subtle py-5"><span className="mono-md pt-0.5 text-text-tertiary">{index + 1}</span><Markdown content={localized.textFor({ entityType: 'recipeStep', entityId: row._id, field: 'text', source: row.text })} className="text-[17px] leading-[1.65]" /></li>)}
