@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.5.0](https://github.com/buildwithfur/bluetape/compare/v1.4.0...v1.5.0) (2026-08-02)
+
+
+### Features
+
+* **auth:** add owner-managed username accounts ([67d417b](https://github.com/buildwithfur/bluetape/commit/67d417bf699a7c827564b33d560d47b41c9e1590))
+* number recipe ingredients ([b259802](https://github.com/buildwithfur/bluetape/commit/b2598025e60bb10c336bcb92d921145bd9d05eb6))
+* **pwa:** add installable app support ([10d357e](https://github.com/buildwithfur/bluetape/commit/10d357ebd11493ac3fac507839de5aa98111c919))
+* **recipes:** add ingredients to shopping cart ([c39b412](https://github.com/buildwithfur/bluetape/commit/c39b412f6740a35e80cca8412609b455a0334696))
+* **recipes:** merge family-language translations ([52ad51c](https://github.com/buildwithfur/bluetape/commit/52ad51c5e04159e7345c9c70c4e5b0cbae5c4b1a))
+* **recipes:** merge numbered recipe ingredients ([e279574](https://github.com/buildwithfur/bluetape/commit/e279574a1858cd4255a35f183c3c7631ca731dcf))
+* support family-language recipe translations ([0c44180](https://github.com/buildwithfur/bluetape/commit/0c44180a41a5a2aa40887e1f783c3e3dae526e19))
+
+
+### Bug Fixes
+
+* **auth:** simplify login heading ([60c7c53](https://github.com/buildwithfur/bluetape/commit/60c7c5302d304922668234e318b9d2632b65693e))
+* ignore stale pending translations in activity toast ([2c191c6](https://github.com/buildwithfur/bluetape/commit/2c191c65c61afbc1a5579560b85e0dc601d74380))
+* **photos:** centralize thumbnail uploads ([e146141](https://github.com/buildwithfur/bluetape/commit/e14614139e7dfd14ae2c0daa8875d3acf05861ea))
+* **photos:** centralize thumbnail uploads ([cd436af](https://github.com/buildwithfur/bluetape/commit/cd436afdacfc3bc658a405c5718dc155d7d1ed6d))
+* **recipes:** move source details to page footer ([4639a43](https://github.com/buildwithfur/bluetape/commit/4639a437de250160562dccf5a8b4ee3c95c7feeb))
+* **recipes:** move source details to page footer ([4f58bf5](https://github.com/buildwithfur/bluetape/commit/4f58bf55ccccfea8ff67fe8f0e15bbf6ba88af80))
+* **recipes:** optimize recipe grid cards ([0d63df2](https://github.com/buildwithfur/bluetape/commit/0d63df28f8064e431b3986006df9ab5dc3fed36c))
+* **recipes:** persist imported source thumbnails ([4cdef38](https://github.com/buildwithfur/bluetape/commit/4cdef3876cfee6f64d6d51ecebe38a1733e3b9e0))
+* **translation:** support configurable reasoning ([18719d0](https://github.com/buildwithfur/bluetape/commit/18719d0b1a0d5f440cf7f8a3de6fe8f9ac11f996))
+* **ui:** refine cart action and markdown lists ([590951c](https://github.com/buildwithfur/bluetape/commit/590951c201bd6b62bb25671e6906e0167e66192e))
+
 ## [1.4.0](https://github.com/buildwithfur/bluetape/compare/v1.3.0...v1.4.0) (2026-07-22)
 
 
