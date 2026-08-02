@@ -311,7 +311,6 @@
   "recipe.steps": "Steps",
   "recipe.source": "Source",
   "recipe.openSource": "Open source",
-  "recipe.importedNotice": "Imported recipe — review against the original source.",
   "recipe.confirmDelete": "Delete this recipe? This can't be undone.",
   "recipe.field.title": "Title",
   "recipe.ingredientNumber": "Ingredient {{number}}",

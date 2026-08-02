@@ -311,7 +311,6 @@
   "recipe.steps": "ပြုလုပ်ပုံအဆင့်များ",
   "recipe.source": "မူရင်း",
   "recipe.openSource": "မူရင်းဖွင့်ရန်",
-  "recipe.importedNotice": "တင်သွင်းထားသော ချက်နည်း — မူရင်းနှင့် ပြန်စစ်ပါ။",
   "recipe.confirmDelete": "ဤချက်နည်းကို ဖျက်မည်လား။ ပြန်ယူ၍မရပါ။",
   "recipe.field.title": "ခေါင်းစဉ်",
   "recipe.ingredientNumber": "ပါဝင်ပစ္စည်း {{number}}",
