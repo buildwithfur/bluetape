@@ -11,6 +11,125 @@ import type { RenderEnv } from '@/types'
 
 const WIKI_RE = /^\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/
 
+const ORDERED_LIST_RE = /^(\s*)(\d+)[.)]\s+(.*)$/
+const BULLET_LIST_RE = /^(\s*)[-+*]\s+(.*)$/
+const ALPHA_LIST_RE = /^(\s*)([a-zA-Z])[.)]\s+(.*)$/
+const FENCE_RE = /^\s*(`{3,}|~{3,})/
+
+type PreviousListLine = {
+  kind: 'ordered' | 'bullet' | 'alpha' | 'other'
+  rawIndent: number
+  indent: number
+  marker: number
+}
+
+type AlphaList = {
+  parentIndent: number
+  parentMarker: number
+  indent: number
+}
+
+/**
+ * Make common pasted household lists render as Markdown lists.
+ *
+ * markdown-it follows CommonMark: `a.` is paragraph text, and four leading
+ * spaces create a code block. Both patterns are common when rules are pasted
+ * from a document, so we normalize only list-looking lines before rendering:
+ * lettered items become a nested ordered list (styled as lower-alpha), while
+ * indented numbered lines without a list parent are dedented out of code.
+ * Stored content is unchanged; this only affects the rendered view.
+ */
+export function normalizeMarkdownLists(content: string): string {
+  const lines = content.replace(/\r\n?/g, '\n').split('\n')
+  const output: string[] = []
+  let inFence = false
+  let previous: PreviousListLine | null = null
+  let alphaList: AlphaList | null = null
+
+  for (const line of lines) {
+    const fence = FENCE_RE.exec(line)
+    if (fence) {
+      inFence = !inFence
+      alphaList = null
+      previous = null
+      output.push(line)
+      continue
+    }
+
+    if (inFence || line.trim() === '') {
+      output.push(line)
+      continue
+    }
+
+    const ordered = ORDERED_LIST_RE.exec(line)
+    if (ordered) {
+      const rawIndent = ordered[1].length
+      const marker = Number(ordered[2])
+      let indent = rawIndent
+
+      // A numbered item that continues the outer list after a pasted alpha
+      // sublist should not remain accidentally nested under that sublist.
+      if (
+        alphaList &&
+        alphaList.parentMarker > 0 &&
+        marker === alphaList.parentMarker + 1 &&
+        rawIndent > alphaList.parentIndent
+      ) {
+        indent = alphaList.parentIndent
+      } else if (rawIndent >= 4) {
+        // Keep genuine nested lists (the previous list marker is less
+        // indented), but dedent standalone indented numbered lines that would
+        // otherwise become a code block.
+        const hasListParent = previous &&
+          (previous.kind === 'ordered' || previous.kind === 'bullet') &&
+          (previous.rawIndent < rawIndent ||
+            (previous.rawIndent === rawIndent && previous.indent === rawIndent))
+        if (!hasListParent) indent = Math.max(0, rawIndent - 4)
+      }
+
+      output.push(`${' '.repeat(indent)}${marker}. ${ordered[3]}`)
+      previous = { kind: 'ordered', rawIndent, indent, marker }
+      alphaList = null
+      continue
+    }
+
+    const bullet = BULLET_LIST_RE.exec(line)
+    if (bullet) {
+      const rawIndent = bullet[1].length
+      output.push(line)
+      previous = { kind: 'bullet', rawIndent, indent: rawIndent, marker: 0 }
+      alphaList = null
+      continue
+    }
+
+    const alpha = ALPHA_LIST_RE.exec(line)
+    if (alpha) {
+      const rawIndent = alpha[1].length
+      const letterMarker = alpha[2].toLowerCase().charCodeAt(0) - 96
+      const parent = previous &&
+        (previous.kind === 'ordered' || previous.kind === 'bullet')
+
+      if (alphaList || parent) {
+        const currentList: AlphaList = alphaList ?? {
+          parentIndent: previous?.indent ?? 0,
+          parentMarker: previous?.kind === 'ordered' ? previous.marker : 0,
+          indent: (previous?.indent ?? 0) + 4,
+        }
+        output.push(`${' '.repeat(currentList.indent)}${letterMarker}. ${alpha[3]}`)
+        alphaList = currentList
+        previous = { kind: 'alpha', rawIndent, indent: currentList.indent, marker: letterMarker }
+        continue
+      }
+    }
+
+    output.push(line)
+    previous = { kind: 'other', rawIndent: line.length - line.trimStart().length, indent: 0, marker: 0 }
+    alphaList = null
+  }
+
+  return output.join('\n')
+}
+
 /** Build a configured markdown-it instance with the wiki-link rule. */
 export function createMarkdownIt(): MarkdownIt {
   const md = new MarkdownIt({

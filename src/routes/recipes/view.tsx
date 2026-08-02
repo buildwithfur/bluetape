@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowSquareOut, Check, PencilSimple, ShoppingCart, Trash } from '@phosphor-icons/react'
+import { ArrowSquareOut, Check, PencilSimple, Plus, ShoppingCart, Trash } from '@phosphor-icons/react'
 import { useTranslation } from 'react-i18next'
 import { TopBar } from '@/components/AppShell'
 import { Markdown } from '@/components/Markdown'
@@ -165,8 +165,15 @@ export default function RecipeView() {
                       aria-busy={cartState === 'adding'}
                       className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xs px-2 text-sm text-ink-700 transition hover:bg-surface-hover active:bg-surface-active disabled:text-text-tertiary"
                     >
-                      {cartState === 'added' ? <Check size={17} weight="bold" aria-hidden="true" /> : <ShoppingCart size={18} aria-hidden="true" />}
-                      <span className="whitespace-nowrap">{cartLabel}</span>
+                      {cartState === 'added' ? (
+                        <Check size={17} weight="bold" aria-hidden="true" />
+                      ) : (
+                        <>
+                          <Plus size={14} weight="bold" aria-hidden="true" />
+                          <ShoppingCart size={18} aria-hidden="true" />
+                        </>
+                      )}
+                      <span className="hidden whitespace-nowrap sm:inline">{cartLabel}</span>
                     </button>
                   </li>
                 )

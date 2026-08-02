@@ -144,6 +144,15 @@ a,
   overflow-wrap: anywhere;
 }
 
+/* Keep nested rule lists readable and visually tied to their parent item. */
+.prose-capped ol ol { list-style-type: lower-alpha; }
+.prose-capped ol ol ol { list-style-type: lower-roman; }
+.prose-capped ul ul { list-style-type: circle; }
+.prose-capped ul ul ul { list-style-type: square; }
+.prose-capped li > p { margin-block: 0; }
+.prose-capped li > ul,
+.prose-capped li > ol { margin-block: 0.25rem; }
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *,

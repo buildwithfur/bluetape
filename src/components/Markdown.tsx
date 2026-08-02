@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useWikiTargetMap } from '@/data/hooks'
-import { createMarkdownIt } from '@/lib/wiki'
+import { createMarkdownIt, normalizeMarkdownLists } from '@/lib/wiki'
 import type { RenderEnv } from '@/types'
 import { cn } from '@/lib/cn'
 import './WikiLink.css'
@@ -24,7 +24,7 @@ export function Markdown({
   const md = useMemo(() => createMarkdownIt(), [])
   const env: RenderEnv = useMemo(() => ({ targetMap }), [targetMap])
   const html = useMemo(
-    () => inline ? md.renderInline(content, env) : md.render(content, env),
+    () => inline ? md.renderInline(content, env) : md.render(normalizeMarkdownLists(content), env),
     [md, env, content, inline],
   )
 
