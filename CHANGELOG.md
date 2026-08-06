@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.6.0](https://github.com/buildwithfur/bluetape/compare/v1.5.0...v1.6.0) (2026-08-06)
+
+
+### Features
+
+* **recipes:** follow linked recipe pages from social captions ([7196e97](https://github.com/buildwithfur/bluetape/commit/7196e97690d772a66c044cf865c11998c42f342a))
+* **recipes:** follow linked recipe pages from social captions ([bf7066c](https://github.com/buildwithfur/bluetape/commit/bf7066cd4672d00a0ad1266fc356086b466709ff))
+* **shopping:** add mobile item deletion controls ([c405074](https://github.com/buildwithfur/bluetape/commit/c405074f80370aff9c46d97a8a00ae7560ddb574))
+* **shopping:** add mobile item deletion controls ([97820f8](https://github.com/buildwithfur/bluetape/commit/97820f8a2cc6c7c662e1d7c8ff49d9897816afce))
+
+
+### Bug Fixes
+
+* **shopping:** correct selection row interactions ([34b7ed3](https://github.com/buildwithfur/bluetape/commit/34b7ed3033e42cc014e70d1dce916eab2f00cbd1))
+* **shopping:** preserve bought state during selection ([0d5229a](https://github.com/buildwithfur/bluetape/commit/0d5229a13775ea914938a090a123c7a7658d108d))
+* **shopping:** preserve bought state during selection ([c7f3899](https://github.com/buildwithfur/bluetape/commit/c7f3899436d3b266fb3319c4f8127afff9ecd1fc))
+
 ## [1.5.0](https://github.com/buildwithfur/bluetape/compare/v1.4.0...v1.5.0) (2026-08-02)
 
 
