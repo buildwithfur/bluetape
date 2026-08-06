@@ -228,7 +228,7 @@ function ShoppingRow({
       >
         {isSelectionMode ? (
           <span className="flex h-12 w-12 shrink-0 items-center justify-center" aria-hidden="true">
-            <CheckCircle checked={selected} />
+            <CheckCircle checked={item.status === 'bought'} />
           </span>
         ) : (
           <button
