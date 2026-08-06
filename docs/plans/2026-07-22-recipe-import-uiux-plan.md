@@ -15,7 +15,7 @@ A family member can paste a TikTok, Instagram, YouTube, or recipe website URL an
 - ordered steps
 - original source URL and source label
 
-Social imports use the post caption/description plus a video transcript. Website imports prefer Recipe JSON-LD/schema.org data and fall back to LLM extraction from readable page content. Extraction is asynchronous and fallible, so the product saves the import as a draft and gives the user a short review step before it becomes a normal family recipe.
+Social imports first inspect the post caption/description. When that text points to the actual recipe instead of containing one, the worker follows a bounded set of public non-social links through the website extraction path before falling back to subtitles, transcription, or visual evidence. The saved source remains the original social post. Website imports prefer Recipe JSON-LD/schema.org data and fall back to LLM extraction from readable page content. Extraction is asynchronous and fallible, so the product saves the import as a draft and gives the user a short review step before it becomes a normal family recipe.
 
 This feature is a first-class household tool, not another generic markdown page type. Recipes have their own index, detail route, structured editor, search group, and bottom-navigation destination, while still participating in Bluetape's `[[link]]` system as both targets and authors.
 
@@ -95,7 +95,7 @@ flowchart TD
     C -->|Yes| D["Open existing recipe"]
     C -->|No| E["Create saved import"]
     E --> F{"Source type"}
-    F -->|TikTok / Instagram / YouTube| G["Read caption and transcribe video"]
+    F -->|TikTok / Instagram / YouTube| G["Read caption, linked recipe page, or transcript as needed"]
     F -->|Website| H["Read Recipe schema"]
     H -->|No usable schema| I["Read page content"]
     G --> J["Extract structured recipe"]
@@ -287,7 +287,7 @@ Convex owns authentication, family permissions, `recipeImportJobs`, recipe recor
 
 When extraction provides a thumbnail, the worker downloads it within a strict size/type limit and uploads it to Convex file storage. Recipes store the storage ID rather than a provider-signed URL; read queries resolve a fresh storage URL for the UI, and recipe deletion removes the stored thumbnail.
 
-The accepted MVP deployment is a long-lived Railway worker in the dedicated **bluetape** project (`8f3dbd79-5e5a-414e-b6f4-38b9b12a0c5b`) under the Indiego Lab workspace, built from the same Dockerfile used locally. Its base toolchain is Python 3.12, `yt-dlp[default]`, `gallery-dl`, `ffmpeg`/`ffprobe`, and Deno. Post-level caption metadata is always assessed first; `gallery-dl` runs only for an Instagram carousel whose text evidence is incomplete. Login-gated sources show an explicit access failure and can be cleared by the importer. See `docs/adr/002-external-recipe-media-worker.md` for the lifecycle, deployment tradeoff, and security constraints.
+The accepted MVP deployment is a long-lived Railway worker in the dedicated **bluetape** project (`8f3dbd79-5e5a-414e-b6f4-38b9b12a0c5b`) under the Indiego Lab workspace, built from the same Dockerfile used locally. Its base toolchain is Python 3.12, `yt-dlp[default]`, `gallery-dl`, `ffmpeg`/`ffprobe`, and Deno. Post-level caption metadata is always assessed first; when it lacks a recipe, public non-social links from that text are tried through the bounded website path before media processing. `gallery-dl` runs only for an Instagram carousel whose text and linked-page evidence are incomplete. Login-gated sources show an explicit access failure and can be cleared by the importer. See `docs/adr/002-external-recipe-media-worker.md` for the lifecycle, deployment tradeoff, and security constraints.
 
 ## 9. User-content translation
 

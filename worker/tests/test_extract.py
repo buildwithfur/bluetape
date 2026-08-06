@@ -139,7 +139,10 @@ def completed_process(stdout: str = "") -> subprocess.CompletedProcess[str]:
 
 def test_caption_recipe_skips_subtitles_and_media(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     commands: list[list[str]] = []
-    metadata = {"title": "Soup", "description": "1 cup water. Boil the water."}
+    metadata = {
+        "title": "Soup",
+        "description": "1 cup water. Boil the water. More: https://example.com/soup",
+    }
 
     def fake_run(command, **_kwargs):
         commands.append(command)
@@ -157,6 +160,11 @@ def test_caption_recipe_skips_subtitles_and_media(monkeypatch: pytest.MonkeyPatc
             sourceLanguage="en",
         ),
     )
+    monkeypatch.setattr(
+        extract,
+        "extract_website",
+        lambda *_args, **_kwargs: pytest.fail("a sufficient caption should not follow links"),
+    )
 
     result = extract.extract_social(social_settings(), FakeClient(), social_job(), tmp_path)
 
@@ -164,6 +172,204 @@ def test_caption_recipe_skips_subtitles_and_media(monkeypatch: pytest.MonkeyPatc
     assert len(commands) == 1
     assert "--skip-download" in commands[0]
     assert "--ignore-errors" in commands[0]
+
+
+def test_linked_recipe_urls_are_bounded_deduplicated_and_non_social() -> None:
+    caption = (
+        "Recipe: https://example.com/soup?from=video#ingredients. "
+        "Again https://example.com/soup?from=video#method "
+        "Channel https://youtube.com/watch?v=other "
+        "More at www.second.example/recipe, https://third.example/recipe "
+        "and https://fourth.example/recipe"
+    )
+
+    assert extract._linked_recipe_urls(
+        caption,
+        "https://www.youtube.com/watch?v=abc",
+    ) == [
+        "https://example.com/soup?from=video",
+        "https://www.second.example/recipe",
+        "https://third.example/recipe",
+    ]
+
+
+def test_insufficient_social_caption_uses_linked_recipe_before_media(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    metadata = {
+        "title": "Soup video",
+        "description": "Full recipe: https://recipes.example/soup",
+        "uploader": "Kitchen Person",
+        "thumbnail": "https://youtube.example/thumb.jpg",
+    }
+    linked_calls: list[tuple[str | None, SourceAccess | None]] = []
+
+    monkeypatch.setattr(
+        extract,
+        "_run",
+        lambda *_args, **_kwargs: completed_process(json.dumps(metadata)),
+    )
+    monkeypatch.setattr(
+        extract,
+        "_parse_llm",
+        lambda *_args, **_kwargs: RecipeAssessment(
+            title="Soup video",
+            sufficient=False,
+            missingEvidence=["ingredients", "steps"],
+        ),
+    )
+
+    def fake_extract_website(
+        _settings,
+        _client,
+        _job,
+        *,
+        source_url=None,
+        access=None,
+        require_sufficient=False,
+    ):
+        assert require_sufficient is True
+        linked_calls.append((source_url, access))
+        return extract.RecipeResult(
+            title="Tomato Soup",
+            ingredients=["4 tomatoes"],
+            steps=["Simmer the tomatoes."],
+            sourceName="Recipe Site",
+            sourceImageUrl="https://recipes.example/soup.jpg",
+            sourceLanguage="en",
+        )
+
+    monkeypatch.setattr(extract, "extract_website", fake_extract_website)
+    monkeypatch.setattr(
+        extract,
+        "_download_audio",
+        lambda *_args: pytest.fail("audio should not download after linked-page extraction"),
+    )
+
+    result = extract.extract_social(social_settings(), FakeClient(), social_job(), tmp_path)
+
+    assert result.title == "Tomato Soup"
+    assert result.ingredients == ["4 tomatoes"]
+    assert result.sourceName == "Kitchen Person"
+    assert result.sourceImageUrl == "https://recipes.example/soup.jpg"
+    assert linked_calls[0][0] == "https://recipes.example/soup"
+    assert isinstance(linked_calls[0][1], SourceAccess)
+
+
+def test_unusable_linked_page_falls_back_to_social_subtitles(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    assessments = iter([
+        RecipeAssessment(title="Soup", sufficient=False, missingEvidence=["ingredients"]),
+        RecipeAssessment(
+            title="Soup",
+            ingredients=["1 cup water"],
+            steps=["Boil the water."],
+            sufficient=True,
+            sourceLanguage="en",
+        ),
+    ])
+    monkeypatch.setattr(
+        extract,
+        "_run",
+        lambda *_args, **_kwargs: completed_process(json.dumps({
+            "title": "Soup",
+            "description": "Recipe at https://example.com/not-a-recipe",
+        })),
+    )
+    monkeypatch.setattr(
+        extract,
+        "extract_website",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            ExtractionError("recipe_not_found", "No recipe on linked page")
+        ),
+    )
+    monkeypatch.setattr(extract, "_subtitle_text", lambda *_args: "1 cup water. Boil it.")
+    monkeypatch.setattr(extract, "_parse_llm", lambda *_args, **_kwargs: next(assessments))
+    monkeypatch.setattr(
+        extract,
+        "_download_audio",
+        lambda *_args: pytest.fail("subtitle recipe should still skip audio"),
+    )
+
+    result = extract.extract_social(social_settings(), FakeClient(), social_job(), tmp_path)
+
+    assert result.steps == ["Boil the water."]
+
+
+def test_incomplete_linked_page_does_not_short_circuit_social_ladder(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    """A caption link to a blog root must not beat the video's own evidence."""
+    assessments = iter([
+        RecipeAssessment(title="Soup", sufficient=False, missingEvidence=["ingredients"]),
+        # The linked page yields a different, partial recipe.
+        RecipeAssessment(
+            title="Banana Bread",
+            ingredients=["3 bananas"],
+            steps=["Bake it."],
+            sufficient=False,
+            missingEvidence=["quantities"],
+            sourceLanguage="en",
+        ),
+        RecipeAssessment(
+            title="Soup",
+            ingredients=["1 cup water"],
+            steps=["Boil the water."],
+            sufficient=True,
+            sourceLanguage="en",
+        ),
+    ])
+    monkeypatch.setattr(
+        extract,
+        "_run",
+        lambda *_args, **_kwargs: completed_process(json.dumps({
+            "title": "Soup",
+            "description": "Everything is on my site: https://example.com",
+        })),
+    )
+    monkeypatch.setattr(
+        extract.SourceAccess,
+        "fetch",
+        lambda *_args, **_kwargs: SimpleNamespace(text=f"<p>{'Banana bread notes. ' * 20}</p>"),
+    )
+    monkeypatch.setattr(extract, "_subtitle_text", lambda *_args: "1 cup water. Boil it.")
+    monkeypatch.setattr(extract, "_parse_llm", lambda *_args, **_kwargs: next(assessments))
+
+    result = extract.extract_social(social_settings(), FakeClient(), social_job(), tmp_path)
+
+    assert result.title == "Soup"
+    assert result.steps == ["Boil the water."]
+
+
+def test_blocked_linked_page_leaves_social_access_unproxied(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Only the social source's own failures may activate the job's proxy."""
+    access = SourceAccess("http://user-sessid.job-123:pass@proxy.example:823")
+    monkeypatch.setattr(
+        extract,
+        "_safe_fetch",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            ExtractionError("site_blocked", "Source returned 403")
+        ),
+    )
+
+    linked = extract._extract_linked_recipe(
+        social_settings(),
+        FakeClient(),
+        social_job(),
+        access,
+        "Recipe at https://example.com/soup",
+        source_name="Kitchen Person",
+        image=None,
+    )
+
+    assert linked is None
+    assert access.using_proxy is False
 
 
 def test_instagram_carousel_uses_requested_item_thumbnail(

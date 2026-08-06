@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import html
 import json
 import re
 import subprocess
@@ -16,6 +17,13 @@ from pydantic import BaseModel, Field, ValidationError
 from .client import ClaimedJob, ConvexWorkerClient
 from .config import Settings
 from .security import UnsafeSourceUrl, validate_public_url
+
+
+MAX_LINKED_RECIPE_URLS = 3
+SOCIAL_SOURCE_HOSTS = ("instagram.com", "tiktok.com", "youtube.com", "youtu.be")
+LINKED_URL_PATTERN = re.compile(
+    r"(?i)(?:https?://|www\.)[^\s<>\[\]{}\"']+"
+)
 
 
 class ExtractionError(RuntimeError):
@@ -741,6 +749,88 @@ def _social_evidence(metadata: dict[str, Any], caption: str, transcript: str = "
     return "\n\n".join(sections)
 
 
+def _is_social_source_host(hostname: str) -> bool:
+    host = hostname.lower().removeprefix("www.")
+    return any(host == domain or host.endswith(f".{domain}") for domain in SOCIAL_SOURCE_HOSTS)
+
+
+def _linked_recipe_urls(caption: str, source_url: str) -> list[str]:
+    """Return a bounded list of non-social HTTP links in caption order."""
+    source_host = (urlparse(source_url).hostname or "").lower().removeprefix("www.")
+    candidates: list[str] = []
+    seen: set[str] = set()
+    for match in LINKED_URL_PATTERN.finditer(html.unescape(caption)):
+        raw = match.group(0).rstrip(".,;:!?…)]}")
+        candidate = raw if raw.lower().startswith(("http://", "https://")) else f"https://{raw}"
+        parsed = urlparse(candidate)
+        hostname = (parsed.hostname or "").lower().removeprefix("www.")
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not hostname
+            or parsed.username
+            or parsed.password
+            or hostname == source_host
+            or _is_social_source_host(hostname)
+        ):
+            continue
+        normalized = parsed._replace(fragment="").geturl()
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        candidates.append(normalized)
+        if len(candidates) == MAX_LINKED_RECIPE_URLS:
+            break
+    return candidates
+
+
+def _social_provenance(
+    result: RecipeResult,
+    *,
+    source_name: Any,
+    image: Any,
+) -> RecipeResult:
+    """Keep social attribution while preferring a linked page's recipe image."""
+    payload = result.model_dump()
+    payload.update({
+        "sourceName": str(source_name).strip() if source_name else result.sourceName,
+        "sourceImageUrl": result.sourceImageUrl or (str(image).strip() if image else None),
+    })
+    try:
+        return RecipeResult.model_validate(payload)
+    except ValidationError:
+        return result
+
+
+def _extract_linked_recipe(
+    settings: Settings,
+    client: ConvexWorkerClient,
+    job: ClaimedJob,
+    access: SourceAccess,
+    caption: str,
+    *,
+    source_name: Any,
+    image: Any,
+) -> RecipeResult | None:
+    for linked_url in _linked_recipe_urls(caption, job.source_url):
+        # A blocked or dead linked page must not switch the social downloads
+        # that follow onto the proxy, so each attempt carries its own access
+        # state over the same job-specific proxy session.
+        linked_access = SourceAccess(access.proxy_url, using_proxy=access.using_proxy)
+        try:
+            result = extract_website(
+                settings,
+                client,
+                job,
+                source_url=linked_url,
+                access=linked_access,
+                require_sufficient=True,
+            )
+        except (ExtractionError, UnsafeSourceUrl):
+            continue
+        return _social_provenance(result, source_name=source_name, image=image)
+    return None
+
+
 def _selected_playlist_entry(metadata: dict[str, Any], source_url: str) -> dict[str, Any]:
     entries = metadata.get("entries")
     if not isinstance(entries, list):
@@ -807,6 +897,18 @@ def extract_social(settings: Settings, client: ConvexWorkerClient, job: ClaimedJ
     )
     if result:
         return result
+
+    linked_result = _extract_linked_recipe(
+        settings,
+        client,
+        job,
+        access,
+        caption,
+        source_name=source_name,
+        image=image,
+    )
+    if linked_result:
+        return linked_result
 
     if job.source_type == "instagram" and isinstance(metadata.get("entries"), list):
         client.stage(job, "extracting_recipe")
@@ -886,10 +988,19 @@ def extract_social(settings: Settings, client: ConvexWorkerClient, job: ClaimedJ
     raise ExtractionError("recipe_not_found", "The source did not contain a usable recipe")
 
 
-def extract_website(settings: Settings, client: ConvexWorkerClient, job: ClaimedJob) -> RecipeResult:
-    access = SourceAccess(_proxy_url_for_job(settings.dataimpulse_proxy_url, job.job_id))
-    response = access.fetch(job.source_url)
-    page_image = source_page_image(response.text, job.source_url)
+def extract_website(
+    settings: Settings,
+    client: ConvexWorkerClient,
+    job: ClaimedJob,
+    *,
+    source_url: str | None = None,
+    access: SourceAccess | None = None,
+    require_sufficient: bool = False,
+) -> RecipeResult:
+    source_url = source_url or job.source_url
+    access = access or SourceAccess(_proxy_url_for_job(settings.dataimpulse_proxy_url, job.job_id))
+    response = access.fetch(source_url)
+    page_image = source_page_image(response.text, source_url)
     schema_recipe = extract_recipe_schema(response.text)
     if schema_recipe:
         client.stage(job, "extracting_recipe")
@@ -909,8 +1020,8 @@ def extract_website(settings: Settings, client: ConvexWorkerClient, job: Claimed
             assessment,
             target_locale=job.target_locale,
             source_name=schema_recipe.sourceName,
-            image=_source_image_url(schema_recipe.sourceImageUrl, job.source_url) or page_image,
-            require_sufficient=False,
+            image=_source_image_url(schema_recipe.sourceImageUrl, source_url) or page_image,
+            require_sufficient=require_sufficient,
         )
         if result:
             return result
@@ -926,7 +1037,7 @@ def extract_website(settings: Settings, client: ConvexWorkerClient, job: Claimed
         target_locale=job.target_locale,
         source_name=None,
         image=page_image,
-        require_sufficient=False,
+        require_sufficient=require_sufficient,
     )
     if not result:
         raise ExtractionError("recipe_not_found", "The source did not contain a usable recipe")
