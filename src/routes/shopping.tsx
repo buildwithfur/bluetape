@@ -170,12 +170,16 @@ function ShoppingRow({
   }
 
   function handleRowKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (!isSelectionMode || event.target !== event.currentTarget) return
     if (event.key !== 'Enter' && event.key !== ' ') return
     event.preventDefault()
-    if (isSelectionMode) {
-      if (selectable) onToggleSelected()
-      return
-    }
+    if (selectable) onToggleSelected()
+  }
+
+  function handleTitleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (isSelectionMode || event.target !== event.currentTarget) return
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
     onOpen()
   }
 
@@ -200,8 +204,8 @@ function ShoppingRow({
       )}
 
       <div
-        role={isSelectionMode ? 'button' : 'link'}
-        tabIndex={0}
+        role={isSelectionMode ? 'button' : undefined}
+        tabIndex={isSelectionMode ? 0 : undefined}
         aria-pressed={isSelectionMode ? selected : undefined}
         aria-disabled={isSelectionMode && !selectable ? true : undefined}
         onClick={handleRowClick}
@@ -224,7 +228,7 @@ function ShoppingRow({
       >
         {isSelectionMode ? (
           <span className="flex h-12 w-12 shrink-0 items-center justify-center" aria-hidden="true">
-            <CheckCircle checked={item.status === 'bought'} />
+            <CheckCircle checked={selected} />
           </span>
         ) : (
           <button
@@ -243,7 +247,12 @@ function ShoppingRow({
           </button>
         )}
 
-        <div className="min-w-0 flex-1 py-3">
+        <div
+          role={isSelectionMode ? undefined : 'link'}
+          tabIndex={isSelectionMode ? undefined : 0}
+          onKeyDown={handleTitleKeyDown}
+          className="min-w-0 flex-1 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+        >
           <Markdown
             inline
             content={title}
