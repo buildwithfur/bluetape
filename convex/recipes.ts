@@ -39,7 +39,7 @@ type RecipeSectionInput = {
   ingredients: string[];
   steps: string[];
 };
-const CURRENT_PIPELINE_VERSION = 3;
+const CURRENT_PIPELINE_VERSION = 4;
 const TRACKING_PARAMS = new Set([
   "fbclid", "gclid", "igsh", "igshid", "si", "feature",
   "utm_campaign", "utm_content", "utm_medium", "utm_source", "utm_term",
